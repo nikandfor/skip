@@ -19,10 +19,8 @@ const (
 	ExpNeg
 	Exp
 
-	emb Num = iota
-
-	Base         = Bin | Oct | Hex
-	Embedded Num = 1 << emb
+	NumOk = Int | Flt
+	Base  = Bin | Oct | Hex
 )
 
 func Number(b []byte, st int) (n Num, i int) {
@@ -183,14 +181,6 @@ func InfNaN(b []byte, st int) (n Num, i int) {
 	return 0, i
 }
 
-func (n Num) Is(x Num) bool {
-	return n&x == x
-}
-
-func (n Num) Any(x Num) bool {
-	return n&x != 0
-}
-
 func skipDigits(b []byte, i int, set Wideset, pad bool) (_ int, ok bool) {
 	for i < len(b) {
 		if pad && b[i] == '_' && i+1 < len(b) && set.Is(b[i+1]) {
@@ -218,4 +208,16 @@ func skipSign(b []byte, i int, n, neg Num) (int, Num) {
 	}
 
 	return i, n
+}
+
+func (n Num) Ok() bool {
+	return n&NumOk != 0
+}
+
+func (n Num) Is(f Num) bool {
+	return n&f == f
+}
+
+func (n Num) Any(f Num) bool {
+	return n&f != 0
 }

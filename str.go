@@ -260,10 +260,18 @@ func decodeQuoChar(b []byte, st int) (s Str, r rune, i int) {
 	return 0, r, i + size
 }
 
-func (s Str) Is(x Str) bool {
-	return s&x == x
+func (s Str) Ok() bool {
+	return s&StrOk != 0
 }
 
-func (s Str) Any(x Str) bool {
-	return s&x != 0
+func (s Str) Err() bool {
+	return s&StrErr != 0
+}
+
+func (s Str) Is(f Str) bool {
+	return s&f == f
+}
+
+func (s Str) Any(f Str) bool {
+	return s&f != 0
 }
