@@ -17,6 +17,11 @@ const (
 	Raw
 	CSV
 
+	_
+	_
+	_
+	_
+
 	ErrChar
 	ErrRune
 	ErrEscape
@@ -243,5 +248,49 @@ func (s Str) Any(f Str) bool {
 }
 
 func (s Str) Format(state fmt.State, v rune) {
+	if s.Err() {
+		fmt.Fprintf(state, s.Error())
+		return
+	}
+
 	fmt.Fprintf(state, "%#x", int(s))
+}
+
+func (s Str) Error() string {
+	if !s.Err() {
+		return "ok"
+	}
+
+	r := ""
+	comma := false
+
+	add := func(e Str, t string) {
+		if !s.Is(e) {
+			return
+		}
+
+		r += csel(comma, ", ", "")
+		r += t
+		comma = true
+	}
+
+	add(ErrChar, "bad char")
+	add(ErrRune, "bad rune")
+	add(ErrEscape, "bad escape")
+	add(ErrQuote, "bad quote")
+	add(ErrIndex, "bad index")
+
+	if r == "" {
+		r = fmt.Sprintf("%#x!!", int(s))
+	}
+
+	return r
+}
+
+func csel[T any](c bool, x, y T) T {
+	if c {
+		return x
+	}
+
+	return y
 }

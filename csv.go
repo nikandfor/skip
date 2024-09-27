@@ -95,12 +95,5 @@ func csvSkipComma(b []byte, i int) int {
 		return i + 1
 	}
 
-	if i < len(b) && b[i] == '\r' {
-		i++
-	}
-	if i < len(b) && b[i] == '\n' {
-		i++
-	}
-
 	return i
 }

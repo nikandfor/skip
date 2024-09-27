@@ -11,6 +11,8 @@ func TestStr(tb *testing.T) {
 		In    string
 		Res   string
 		St, I int
+
+		NoWrap bool
 	}
 
 	var buf []byte
@@ -40,17 +42,26 @@ func TestStr(tb *testing.T) {
 		{Flags: Raw | Quo | Sqt, Want: Quo, I: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
 		{Flags: Raw | Quo | Sqt, Want: Sqt, I: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
 
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, I: 13, In: `"abc""d""ef"`, Res: `abc"d"ef`},
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, I: 7, In: `abc ww`, Res: `abc ww`},
+		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, I: 1, In: `1`, Res: `1`},
+		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, I: 1, In: `1`, Res: `1`, NoWrap: true},
+
+		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, I: 12, In: `"abc""d""ef"`, Res: `abc"d"ef`},
+		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, I: 6, In: `abc ww`, Res: `abc ww`},
 
 		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, St: 6, I: 12, In: `"abc","def","qwe"`, Res: `def`},
 		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 6, I: 14, In: `a b c, d e f ,q w e`, Res: ` d e f `},
 
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, St: 12, I: 18, In: `"abc","def","qwe"`, Res: `qwe`},
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 14, I: 20, In: `a b c, d e f ,q w e`, Res: `q w e`},
+		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, St: 12, I: 17, In: `"abc","def","qwe"`, Res: `qwe`},
+		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 14, I: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
 	} {
-		pref := []byte("\n\n\t")
-		in := append(pref, tc.In...)
+		var pref []byte
+		var in []byte
+
+		if !tc.NoWrap {
+			pref = []byte("\n\n\t")
+		}
+
+		in = append(pref, tc.In...)
 		in = append(in, pref...)
 
 		st := tc.St
