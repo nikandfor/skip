@@ -8,7 +8,6 @@ const (
 	Neg Num = 1 << iota
 	NaN
 	Inf
-
 	Int
 	Flt
 
@@ -19,16 +18,12 @@ const (
 	ExpNeg
 	Exp
 
-	NumOk = Int | Flt
+	NumOk = Int | Flt | NaN | Inf
 	Base  = Bin | Oct | Hex
 )
 
 func Number(b []byte, st int) (n Num, i int) {
 	if st >= len(b) {
-		return
-	}
-
-	if n, i = InfNaN(b, st); n != 0 {
 		return
 	}
 
@@ -44,8 +39,11 @@ func Number(b []byte, st int) (n Num, i int) {
 }
 
 func Float(b []byte, st int) (n Num, i int) {
-	i = st
+	if n, i = InfNaN(b, st); n != 0 {
+		return
+	}
 
+	i = st
 	i, n = skipSign(b, i, n, Neg)
 
 	set := Decimals.Wide()
