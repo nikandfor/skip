@@ -2,15 +2,16 @@ package skip
 
 import (
 	"testing"
+	"unicode/utf8"
 )
 
 func TestStr(tb *testing.T) {
 	type TC struct {
-		Flags Str
-		Want  Str
-		In    string
-		Res   string
-		St, I int
+		Flags    Str
+		Want     Str
+		In       string
+		Res      string
+		St, I, L int
 
 		NoWrap bool
 	}
@@ -53,6 +54,9 @@ func TestStr(tb *testing.T) {
 
 		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, St: 12, I: 17, In: `"abc","def","qwe"`, Res: `qwe`},
 		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 14, I: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
+
+		{Flags: Quo | ErrRune, Want: Quo, I: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},
+		{Flags: Quo | ErrRune, Want: Quo, I: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
 	} {
 		var pref []byte
 		var in []byte
@@ -73,11 +77,12 @@ func TestStr(tb *testing.T) {
 
 		st += len(pref)
 		tci += len(pref)
+		ll := utf8.RuneCountInString(tc.Res)
 
 		s, l, i := String(in, st, tc.Flags)
 		assert(tb, s == tc.Want, "s %v, wanted %v", s, tc.Want)
 		assert(tb, i == tci, "index %v, wanted %v  of %v", i-len(pref), tc.I, len(tc.In))
-		assert(tb, l == len(tc.Res), "len %v, wanted %v", l, len(tc.Res))
+		assert(tb, s.Err() || l == ll, "len %v, wanted %v", l, ll)
 
 		s, buf, i = DecodeString(in, st, tc.Flags, buf[:0])
 		assert(tb, s == tc.Want, "s %v, wanted %v", s, tc.Want)

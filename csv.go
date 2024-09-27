@@ -30,8 +30,7 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		brk.Merge("\n\r")
 		skip.Merge("\t")
 
-		s, i = skipStrPart(b, i, s, brk, skip)
-		l = i - st
+		s, l, i = skipStrPart(b, i, l, s, flags, brk, skip)
 		if s.Err() {
 			return s, buf, l, i
 		}
@@ -53,12 +52,11 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 	for i < len(b) {
 		done := i
 
-		s, i = skipStrPart(b, i, s, brk, skip)
+		s, l, i = skipStrPart(b, i, l, s, flags, brk, skip)
 		if s.Err() {
 			return s, buf, i - st, i
 		}
 
-		l += i - done
 		if dec {
 			buf = append(buf, b[done:i]...)
 		}

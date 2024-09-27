@@ -17,8 +17,8 @@ var (
 	HighHexes   = Decimals.Wide().MergeCopy("ABCDEF")
 	Hexes       = LowHexes.OrCopy(HighHexes)
 
-	Lower   = NewWideset("").MergeRangeCopy('a', 'z')
-	Upper   = NewWideset("").MergeRangeCopy('A', 'Z')
+	Lower   = NewWidesetRange('a', 'z')
+	Upper   = NewWidesetRange('A', 'Z')
 	Letters = Lower.OrCopy(Upper)
 
 	Underscore   = NewWideset("_")
@@ -35,27 +35,19 @@ func Spaces(b []byte, i int) int {
 }
 
 func NewWideset(s string) (x Wideset) {
-	for _, c := range s {
-		if c >= 64 {
-			x[1] |= 1 << (c - 64)
-		}
+	return Wideset{}.MergeCopy(s)
+}
 
-		x[0] |= 1 << c
-	}
-
-	return x
+func NewWidesetRange(a, b byte) Wideset {
+	return Wideset{}.MergeRangeCopy(a, b)
 }
 
 func NewCharset(s string) (x Charset) {
-	for _, c := range s {
-		if c >= 64 {
-			panic(c)
-		}
+	return Charset(0).MergeCopy(s)
+}
 
-		x |= 1 << c
-	}
-
-	return x
+func NewCharsetRange(a, b byte) Charset {
+	return Charset(0).MergeRangeCopy(a, b)
 }
 
 func (x Wideset) Skip(b []byte, i int) int {

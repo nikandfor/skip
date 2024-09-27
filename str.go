@@ -2,6 +2,7 @@ package skip
 
 import (
 	"fmt"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -27,8 +28,9 @@ const (
 	ErrEscape
 	ErrQuote
 	ErrIndex
+	ErrBuffer
 
-	StrErr = ErrChar | ErrRune | ErrEscape | ErrQuote | ErrIndex
+	StrErr = ErrChar | ErrRune | ErrEscape | ErrQuote | ErrIndex | ErrBuffer
 )
 
 var esc2rune = []rune{
@@ -69,12 +71,11 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	for i < len(b) {
 		done := i
 
-		s, i = skipStrPart(b, i, s, brk, skip)
+		s, l, i = skipStrPart(b, i, l, s, flags, brk, skip)
 		if s.Err() {
 			return s, buf, l, i
 		}
 
-		l += i - done
 		if dec {
 			buf = append(buf, b[done:i]...)
 		}
@@ -131,7 +132,7 @@ func openStr(b []byte, st int, flags Str) (s Str, brk, skip, fin Wideset, i int)
 	return s, brk, skip, fin, i
 }
 
-func skipStrPart(b []byte, st int, s Str, brk, skip Wideset) (ss Str, i int) {
+func skipStrPart(b []byte, st, l int, s, flags Str, brk, skip Wideset) (ss Str, ll, i int) {
 	//	defer func() { log.Printf("skipStrP %d %q -> %d  => %v  from %v", st, b[st], i, ss, loc.Caller(1)) }()
 	i = st
 
@@ -140,22 +141,27 @@ func skipStrPart(b []byte, st int, s Str, brk, skip Wideset) (ss Str, i int) {
 			break
 		}
 		if b[i] < 0x20 && !skip.Is(b[i]) {
-			return ErrChar, i
+			return ErrChar, l, i
 		}
 		if b[i] < 0x80 {
 			i++
+			l++
 			continue
 		}
 
 		r, size := utf8.DecodeRune(b[i:])
+		if r == utf8.RuneError && flags.Is(ErrRune) {
+			return s, l, i
+		}
 		if r == utf8.RuneError {
-			return ErrRune, i
+			return ErrRune, l, i
 		}
 
 		i += size
+		l++
 	}
 
-	return s, i
+	return s, l, i
 }
 
 func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
@@ -166,8 +172,12 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 	}
 
 	if b[i] != '\\' {
+		if !utf8.FullRune(b[i:]) {
+			return ErrBuffer, 0, i
+		}
+
 		r, size := utf8.DecodeRune(b[i:])
-		if r == utf8.RuneError {
+		if r == utf8.RuneError && !flags.Is(ErrRune) {
 			return ErrRune, 0, i
 		}
 
@@ -215,20 +225,42 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 		return ErrEscape, 0, i
 	}
 
-	if i+size >= len(b) {
-		return ErrEscape, 0, i - 1
+	decode := func(i, size int) (r rune) {
+		for j := 0; j < size; j++ {
+			c := b[i+j] | 0x20 // make lower
+			r = r << 4
+
+			if c >= '0' && c <= '9' {
+				r += rune(c - '0')
+			} else if c >= 'a' && c <= 'f' {
+				r += 10 + rune(c-'a')
+			} else {
+				return -rune(ErrEscape)
+			}
+		}
+
+		return r
 	}
 
-	for j := 0; j < size; j++ {
-		c := b[i+j] | 0x20 // make lower
-		r = r << 4
+	if i+size > len(b) {
+		return ErrBuffer, 0, i - 1
+	}
 
-		if c >= '0' && c <= '9' {
-			r += rune(c - '0')
-		} else if c >= 'a' && c <= 'f' {
-			r += 10 + rune(c-'a')
-		} else {
-			return ErrEscape, 0, i - 1
+	r = decode(i, size)
+	if r < 0 {
+		return -Str(r), 0, i - 1
+	}
+
+	if utf16.IsSurrogate(r) && b[i-1] == 'u' && i+10 <= len(b) && b[i+4] == '\\' && b[i+5] == 'u' {
+		r2 := decode(i+6, size)
+		if r2 < 0 {
+			return -Str(r2), 0, i - 1
+		}
+
+		rr := utf16.DecodeRune(r, r2)
+		if rr != utf8.RuneError {
+			r = rr
+			i += 6
 		}
 	}
 
@@ -279,9 +311,10 @@ func (s Str) Error() string {
 	add(ErrEscape, "bad escape")
 	add(ErrQuote, "bad quote")
 	add(ErrIndex, "bad index")
+	add(ErrBuffer, "short buffer")
 
 	if r == "" {
-		r = fmt.Sprintf("%#x!!", int(s))
+		r = fmt.Sprintf("%#x", int(s))
 	}
 
 	return r
