@@ -17,6 +17,8 @@ func TestStr(tb *testing.T) {
 	}
 
 	var buf []byte
+	var fail TC
+	var failj int
 
 	for j, tc := range []TC{
 		{Flags: Raw | Quo | Sqt, Want: Raw, I: -1, In: "`abc`", Res: `abc`},
@@ -27,9 +29,9 @@ func TestStr(tb *testing.T) {
 		{Flags: Raw, Want: ErrQuote, I: 0, In: `"abc"`},
 		{Flags: Sqt, Want: ErrQuote, I: 0, In: `"abc"`},
 
-		{Flags: Raw | Quo | Sqt, Want: ErrQuote, I: 8, In: "`abc\"", Res: "abc\"\n\n\t"},
-		{Flags: Raw | Quo | Sqt, Want: ErrChar, I: 5, In: "\"abc`"},
-		{Flags: Raw | Quo | Sqt, Want: ErrChar, I: 5, In: "\"abc'"},
+		{Flags: Raw | Quo | Sqt, Want: Raw | ErrBuffer, I: 8, In: "`abc\"", Res: "abc\"\n\n\t"},
+		{Flags: Raw | Quo | Sqt, Want: Quo | ErrChar, I: 5, In: "\"abc`", Res: "abc`"},
+		{Flags: Raw | Quo | Sqt, Want: Quo | ErrChar, I: 5, In: "\"abc'", Res: "abc'"},
 
 		{Flags: Raw | Quo | Sqt, Want: Raw, I: -1, In: "`ab\nc`", Res: "ab\nc"},
 		{Flags: Raw | Quo | Sqt, Want: Raw, I: -1, In: "`a\"b\n\"c`", Res: "a\"b\n\"c"},
@@ -80,9 +82,15 @@ func TestStr(tb *testing.T) {
 		ll := utf8.RuneCountInString(tc.Res)
 
 		s, l, i := String(in, st, tc.Flags)
-		assert(tb, s == tc.Want, "s %v, wanted %v", s, tc.Want)
+		assert(tb, s == tc.Want, "s %#v, wanted %#v", s, tc.Want)
 		assert(tb, i == tci, "index %v, wanted %v  of %v", i-len(pref), tc.I, len(tc.In))
-		assert(tb, s.Err() || l == ll, "len %v, wanted %v", l, ll)
+		assert(tb, l == ll, "len %v, wanted %v", l, ll)
+
+		if tb.Failed() {
+			fail = tc
+			failj = j
+			break
+		}
 
 		s, buf, i = DecodeString(in, st, tc.Flags, buf[:0])
 		assert(tb, s == tc.Want, "s %v, wanted %v", s, tc.Want)
@@ -90,7 +98,34 @@ func TestStr(tb *testing.T) {
 		assert(tb, Equal(buf, []byte(tc.Res)), "res %q", buf)
 
 		if tb.Failed() {
-			tb.Logf("failed at %d, %#v", j, tc)
+			fail = tc
+			failj = j
+			break
+		}
+	}
+
+	if tb.Failed() {
+		tb.Logf("failed at %d, %#v", failj, fail)
+	}
+}
+
+func TestStrContinue(tb *testing.T) {
+	b := []byte(`"ab\u0030cd"`)
+
+	var w []byte
+
+	for st := 1; st < len(b); st++ {
+		w = w[:0]
+
+		s, w, i := DecodeString(b[:st], 0, Quo, w)
+		tb.Logf("%#x: %[1]v", s)
+		assert(tb, s.Is(ErrBuffer), "wanted error: %v", s)
+
+		s, w, i = DecodeString(b, i, s|Continue, w)
+		tb.Logf("%#x: %[1]v", s)
+		assert(tb, !s.Err(), "didn't want error: %v", s)
+
+		if tb.Failed() {
 			break
 		}
 	}

@@ -2,6 +2,7 @@ package skip
 
 func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, l, i int) {
 	//	defer func() { log.Printf("csvSkip  from %v", loc.Caller(1)) }()
+	s |= CSV
 
 	var brk, skip Wideset
 	var q byte
@@ -35,7 +36,7 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 			return s, buf, l, i
 		}
 		if i < len(b) && !brk.Is(b[i]) {
-			return ErrChar, buf, l, i
+			return s | ErrChar, buf, l, i
 		}
 
 		if dec {
@@ -46,7 +47,7 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 
 		return s | CSV, buf, l, i
 	default:
-		return ErrQuote, buf, 0, st
+		return s | ErrQuote, buf, 0, st
 	}
 
 	for i < len(b) {
@@ -78,14 +79,14 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		break
 	}
 	if i == len(b) || b[i] != q {
-		return ErrQuote, buf, l, i
+		return s | ErrQuote, buf, l, i
 	}
 
 	i++
 
 	i = csvSkipComma(b, i)
 
-	return s | CSV, buf, l, i
+	return s, buf, l, i
 }
 
 func csvSkipComma(b []byte, i int) int {
