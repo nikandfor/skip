@@ -27,11 +27,11 @@ func Number(b []byte, st int) (n Num, i int) {
 		return
 	}
 
-	if n, i = Integer(b, st); n != 0 {
+	if n, i = Float(b, st); n != 0 {
 		return
 	}
 
-	if n, i = Float(b, st); n != 0 {
+	if n, i = Integer(b, st); n != 0 {
 		return
 	}
 
@@ -39,6 +39,7 @@ func Number(b []byte, st int) (n Num, i int) {
 }
 
 func Float(b []byte, st int) (n Num, i int) {
+	//	defer func() { log.Printf("Float    %d %q -> %d  => %v  from %v", st, b[st:], i, n, loc.Caller(1)) }()
 	if n, i = InfNaN(b, st); n != 0 {
 		return
 	}
@@ -48,43 +49,46 @@ func Float(b []byte, st int) (n Num, i int) {
 
 	set := Decimals.Wide()
 	exp := byte('e')
+	dot := false
 
 	switch {
 	case i == len(b):
 		return 0, st
-	case b[i] == '0' && i+1 < len(b) && (b[i] == 'x' || b[i] == 'X'):
+	case b[i] == '0' && i+1 < len(b) && (b[i+1] == 'x' || b[i+1] == 'X'):
 		n |= Hex
 		set = Hexes
 		exp = 'p'
 		i += 2
 	case b[i] >= '0' && b[i] <= '9':
-		n |= Int
+		//	n |= Int
+	case b[i] == '.':
+		dot = true
 	default:
 		return 0, st
 	}
 
-	var ok, dot, ok2 bool
+	var ok, ok2 bool
 
 	i, ok = skipDigits(b, i, set, n.Is(Hex))
 
 	if i < len(b) && b[i] == '.' {
 		i++
-		i, ok = skipDigits(b, i, set, false)
+		i, ok2 = skipDigits(b, i, set, false)
 		dot = true
-	} else {
-		ok2 = true
 	}
 
-	if !ok && !ok2 {
+	if !(ok || ok2) {
 		return 0, st
 	}
 
 	if i == len(b) || b[i] != exp && b[i] != exp-0x20 {
-		if exp == 'e' && dot {
-			return n | Flt, i
+		if dot {
+			n |= Flt
+		} else {
+			n |= Int
 		}
 
-		return 0, st
+		return n, i
 	}
 	i++
 
@@ -99,6 +103,7 @@ func Float(b []byte, st int) (n Num, i int) {
 }
 
 func Integer(b []byte, st int) (n Num, i int) {
+	//	defer func() { log.Printf("Int      %d %q -> %d  => %v  from %v", st, b[st:], i, n, loc.Caller(1)) }()
 	i = st
 
 	i, n = skipSign(b, i, n, Neg)
@@ -134,12 +139,11 @@ func Integer(b []byte, st int) (n Num, i int) {
 			return 0, st
 		}
 	case b[i] >= '1' && b[i] <= '9':
-		i++
 	default:
 		return 0, st
 	}
 
-	i, ok := skipDigits(b, i, set, true)
+	i, ok := skipDigits(b, i, set, n != 0)
 	if !ok {
 		return n, st
 	}

@@ -32,7 +32,10 @@ func MatchFold(x, y []byte) int {
 
 		if xx == yy && xx >= 'a' && xx <= 'z' {
 			i++
+			continue
 		}
+
+		break
 	}
 
 	return i
