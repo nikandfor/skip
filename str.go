@@ -49,17 +49,17 @@ var esc2rune = []rune{
 	'v':  '\v',
 }
 
-func DecodeString(b []byte, st int, flags Str, buf []byte) (s Str, _ []byte, i int) {
-	s, buf, _, i = skipString(b, st, flags, buf, true)
-	return s, buf, i
+func DecodeString(b []byte, st int, flags Str, buf []byte) (s Str, _ []byte, rs, i int) {
+	s, buf, _, rs, i = skipString(b, st, flags, buf, true)
+	return s, buf, rs, i
 }
 
-func String(b []byte, st int, flags Str) (s Str, l, i int) {
-	s, _, l, i = skipString(b, st, flags, nil, false)
-	return s, l, i
+func String(b []byte, st int, flags Str) (s Str, bs, rs, i int) {
+	s, _, bs, rs, i = skipString(b, st, flags, nil, false)
+	return s, bs, rs, i
 }
 
-func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, l, i int) {
+func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, bs, rs, i int) {
 	if flags.Is(CSV) {
 		return csvSkip(b, st, flags, buf, dec)
 	}
@@ -70,7 +70,7 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	//	defer func() { log.Printf("skipStr  %d (%s) -> %d  => %v  from %v", st, b, i, s, loc.Caller(1)) }()
 	s, brk, halt, fin, i := openStr(b, st, flags)
 	if s.Err() {
-		return s, buf, 0, st
+		return s, buf, 0, 0, st
 	}
 
 	var r rune
@@ -78,38 +78,42 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	for i < len(b) {
 		done := i
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
+		s, rs, i = skipStrPart(b, i, rs, s, flags, brk.OrCopy(halt))
+		bs += i - done
 		if dec {
 			buf = append(buf, b[done:i]...)
 		}
 		if s.Err() {
-			return s, buf, l, i
+			return s, buf, bs, rs, i
 		}
 
 		if i == len(b) || fin.Is(b[i]) {
 			break
 		}
 		if halt.Is(b[i]) {
-			return s | ErrChar, buf, l, i
+			return s | ErrChar, buf, bs, rs, i
 		}
 
 		s, r, i = decodeStrChar(b, i, s, flags)
 		if s.Err() {
-			return s, buf, l, i
+			return s, buf, bs, rs, i
 		}
 
-		l++
-		buf = utf8.AppendRune(buf, r)
+		bs += runelen(r)
+		rs++
+		if dec {
+			buf = utf8.AppendRune(buf, r)
+		}
 	}
 
 	if i == len(b) {
-		return s | ErrBuffer, buf, l, i
+		return s | ErrBuffer, buf, bs, rs, i
 	}
 	if !fin.Is(b[i]) {
-		return s | ErrQuote, buf, l, i
+		return s | ErrQuote, buf, bs, rs, i
 	}
 
-	return s, buf, l, i + 1
+	return s, buf, bs, rs, i + 1
 }
 
 func openStr(b []byte, st int, flags Str) (s Str, brk, halt, fin Wideset, i int) {
@@ -280,6 +284,11 @@ func decodeEscape(b []byte, i, size int) (r rune) {
 	}
 
 	return r
+}
+
+func runelen(r rune) int {
+	b := utf8.RuneLen(r)
+	return csel(b >= 0, b, 3)
 }
 
 func (s Str) Err() bool {

@@ -1,6 +1,7 @@
 package skip
 
 import (
+	"strconv"
 	"testing"
 	"unicode/utf8"
 )
@@ -88,10 +89,11 @@ func TestStr(tb *testing.T) {
 		end += len(pref)
 		ll := utf8.RuneCountInString(tc.Res)
 
-		s, l, i := String(in, st, tc.Flags)
+		s, bs, rs, i := String(in, st, tc.Flags)
 		assert(tb, s == tc.Want, "s %#v, wanted %#v", s, tc.Want)
 		assert(tb, i == end, "index %v, wanted %v  of %v", i, end, 2*len(pref)+len(tc.In))
-		assert(tb, l == ll, "len %v, wanted %v", l, ll)
+		assert(tb, bs == len(tc.Res), "bytes %v, wanted %v", bs, len(tc.Res))
+		assert(tb, rs == ll, "runes %v, wanted %v", rs, ll)
 
 		if tb.Failed() {
 			fail = tc
@@ -99,9 +101,10 @@ func TestStr(tb *testing.T) {
 			break
 		}
 
-		s, buf, i = DecodeString(in, st, tc.Flags, buf[:0])
+		s, buf, rs, i = DecodeString(in, st, tc.Flags, buf[:0])
 		assert(tb, s == tc.Want, "s %v, wanted %v", s, tc.Want)
 		assert(tb, i == end, "index %v, wanted %v  of %v", i-len(pref), end, len(tc.In))
+		assert(tb, rs == ll, "runes %v, wanted %v", rs, ll)
 		assert(tb, Equal(buf, []byte(tc.Res)), "res %q", buf)
 
 		if tb.Failed() {
@@ -118,24 +121,48 @@ func TestStr(tb *testing.T) {
 
 func TestStrContinue(tb *testing.T) {
 	b := []byte(`"ab\u0030cd"`)
+	exprs := 5
 
 	var w []byte
 
 	for st := 1; st < len(b); st++ {
 		w = w[:0]
 
-		s, w, i := DecodeString(b[:st], 0, Quo, w)
+		s, w, rs0, i := DecodeString(b[:st], 0, Quo, w)
 		tb.Logf("%#x: %[1]v", s)
 		assert(tb, s.Is(ErrBuffer), "wanted error: %v", s)
 
-		s, w, i = DecodeString(b, i, s|Continue, w)
+		s, w, rs1, i := DecodeString(b, i, s|Continue, w)
 		tb.Logf("%#x: %[1]v", s)
 		assert(tb, !s.Err(), "didn't want error: %v", s)
+		assert(tb, rs0+rs1 == exprs, "rune count %d + %d != %d  (%d: %s|%s)", rs0, rs1, exprs, st, b[:st], b[st:])
 
 		if tb.Failed() {
 			break
 		}
 	}
+}
+
+func TestIssue1(tb *testing.T) {
+	data := `"The supermarket baby food aisle in the United States is packed with non-nutritious foods containing far too much sugar and salt and misleading marketing claims, a new study found.\n\nSixty percent of 651 foods that are marketed for children ages 6 months to 36 months on 10 supermarkets' shelves in the US failed to meet recommended World Health Organization nutritional guidelines for infant and toddler foods, according to the study, which was published this month in the peer-reviewed journal Nutrients.\n\nAlmost none of the foods met all of the WHO standards for advertising, which focus on clear labeling of ingredients and accurate health claims.\n\nRead more about the research at the link in our bio.\n\n📸: Maria Argutinskaya/iStockphoto/Getty Images"`
+
+	exp, err := strconv.Unquote(data)
+	assert(tb, err == nil, "unquote: %v", err)
+
+	expl := utf8.RuneCountInString(exp)
+	b := []byte(data)
+
+	s, bs, rs, i := String(b, 0, Quo)
+	assert(tb, !s.Err(), "error: %v", s)
+	assert(tb, i == len(b), "i / len(data): %d / %d", i, len(data))
+	assert(tb, bs == len([]byte(exp)), "len %v, wanted %v", rs, len([]byte(exp)))
+	assert(tb, rs == expl, "len %v, wanted %v", rs, expl)
+
+	s, buf, rs, i := DecodeString(b, 0, Quo, nil)
+	assert(tb, !s.Err(), "error: %v", s)
+	assert(tb, i == len(b), "i / len(data): %d / %d", i, len(data))
+	assert(tb, rs == expl, "decoded: %s", buf)
+	assert(tb, string(buf) == exp, "decoded: %s", buf)
 }
 
 func assert(tb testing.TB, ok bool, msg string, args ...any) bool {

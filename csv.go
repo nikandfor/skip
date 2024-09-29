@@ -1,6 +1,6 @@
 package skip
 
-func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, l, i int) {
+func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, bs, rs, i int) {
 	//	defer func() { log.Printf("csvSkip  from %v", loc.Caller(1)) }()
 	s |= CSV
 
@@ -34,33 +34,35 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		brk.Merge("\n\r")
 		halt.Except("\t")
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
+		s, rs, i = skipStrPart(b, i, rs, s, flags, brk.OrCopy(halt))
+		bs = i - st
 		if dec {
 			buf = append(buf, b[st:i]...)
 		}
 		if s.Err() {
-			return s, buf, l, i
+			return s, buf, bs, rs, i
 		}
 		if i < len(b) && !brk.Is(b[i]) {
-			return s | ErrChar, buf, l, i
+			return s | ErrChar, buf, bs, rs, i
 		}
 
 		i = csvSkipComma(b, i)
 
-		return s | CSV, buf, l, i
+		return s | CSV, buf, bs, rs, i
 	default:
-		return s | ErrQuote, buf, 0, st
+		return s | ErrQuote, buf, 0, 0, st
 	}
 
 	for i < len(b) {
 		done := i
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
+		s, rs, i = skipStrPart(b, i, rs, s, flags, brk.OrCopy(halt))
+		bs += i - done
 		if dec {
 			buf = append(buf, b[done:i]...)
 		}
 		if s.Err() {
-			return s, buf, i - st, i
+			return s, buf, bs, rs, i
 		}
 
 		if i == len(b) || b[i] != q {
@@ -68,7 +70,8 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		}
 
 		if i+1 < len(b) && b[i+1] == q {
-			l++
+			bs++
+			rs++
 			if dec {
 				buf = append(buf, q)
 			}
@@ -80,14 +83,14 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		break
 	}
 	if i == len(b) || b[i] != q {
-		return s | ErrChar, buf, l, i
+		return s | ErrChar, buf, bs, rs, i
 	}
 
 	i++
 
 	i = csvSkipComma(b, i)
 
-	return s, buf, l, i
+	return s, buf, bs, rs, i
 }
 
 func csvSkipComma(b []byte, i int) int {

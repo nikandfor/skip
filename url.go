@@ -4,7 +4,7 @@ import (
 	"unicode/utf8"
 )
 
-func urlSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, l, i int) {
+func urlSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, bs, rs, i int) {
 	//	defer func() { log.Printf("urlSkip  from %v", loc.Caller(1)) }()
 	s |= URL
 	i = st
@@ -17,33 +17,35 @@ func urlSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 	for {
 		done := i
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
+		s, rs, i = skipStrPart(b, i, rs, s, flags, brk.OrCopy(halt))
+		bs += i - done
 		if dec {
 			buf = append(buf, b[done:i]...)
 		}
 		if s.Err() {
-			return s, buf, l, i
+			return s, buf, bs, rs, i
 		}
 
 		if i == len(b) || brk.Is(b[i]) && b[i] != '%' && b[i] != '+' {
 			break
 		}
 		if halt.Is(b[i]) {
-			return s | ErrChar, buf, l, i
+			return s | ErrChar, buf, bs, rs, i
 		}
 
 		s, r, i = decodeURLChar(b, i, s, flags)
 		if s.Err() {
-			return s, buf, l, i
+			return s, buf, bs, rs, i
 		}
 
-		l++
+		bs += runelen(r)
+		rs++
 		if dec {
 			buf = utf8.AppendRune(buf, r)
 		}
 	}
 
-	return s, buf, l, i
+	return s, buf, bs, rs, i
 }
 
 func decodeURLChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
