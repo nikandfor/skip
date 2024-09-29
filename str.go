@@ -62,7 +62,7 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	}
 
 	//	defer func() { log.Printf("skipStr  %d (%s) -> %d  => %v  from %v", st, b, i, s, loc.Caller(1)) }()
-	s, brk, skip, fin, i := openStr(b, st, flags)
+	s, brk, halt, fin, i := openStr(b, st, flags)
 	if s.Err() {
 		return s, buf, 0, st
 	}
@@ -72,7 +72,7 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	for i < len(b) {
 		done := i
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk, skip)
+		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
 		if dec {
 			buf = append(buf, b[done:i]...)
 		}
@@ -82,6 +82,10 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 
 		if i == len(b) || fin.Is(b[i]) {
 			break
+		}
+
+		if halt.Is(b[i]) {
+			return s | ErrChar, buf, l, i
 		}
 
 		s, r, i = decodeStrChar(b, i, s, flags)
@@ -103,9 +107,10 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	return s, buf, l, i + 1
 }
 
-func openStr(b []byte, st int, flags Str) (s Str, brk, skip, fin Wideset, i int) {
+func openStr(b []byte, st int, flags Str) (s Str, brk, halt, fin Wideset, i int) {
 	//	defer func() { log.Printf("openStr  %d %q  %#v -> %d  => %v  from %v", st, b[st], flags, i, s, loc.Caller(1)) }()
 	i = st
+	halt = NewWidesetRange(0, 31)
 
 	switch {
 	case i >= len(b):
@@ -114,7 +119,7 @@ func openStr(b []byte, st int, flags Str) (s Str, brk, skip, fin Wideset, i int)
 		s |= Raw
 		fin.Merge("`")
 		brk.Merge("`")
-		skip.Merge("\t\n")
+		halt.Not(Whitespaces.Wide())
 
 		i += csel(flags.Is(Continue), 0, 1)
 	case flags.Is(Quo) && (b[i] == '"' || flags.Is(Continue)):
@@ -133,19 +138,16 @@ func openStr(b []byte, st int, flags Str) (s Str, brk, skip, fin Wideset, i int)
 		s |= ErrQuote
 	}
 
-	return s, brk, skip, fin, i
+	return s, brk, halt, fin, i
 }
 
-func skipStrPart(b []byte, st, l int, s, flags Str, brk, skip Wideset) (ss Str, ll, i int) {
+func skipStrPart(b []byte, st, l int, s, flags Str, brk Wideset) (ss Str, ll, i int) {
 	//	defer func() { log.Printf("skipStrP %d %q -> %d  => %v  from %v", st, b[st], i, ss, loc.Caller(1)) }()
 	i = st
 
 	for i < len(b) {
 		if brk.Is(b[i]) {
 			break
-		}
-		if b[i] < 0x20 && !skip.Is(b[i]) {
-			return s | ErrChar, l, i
 		}
 		if b[i] < 0x80 {
 			i++
@@ -175,6 +177,25 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 		return s | ErrIndex, 0, st
 	}
 
+	if b[i] == '%' {
+		i++
+
+		if i+1 >= len(b) {
+			return s | ErrBuffer, 0, st
+		}
+
+		if !Hexes.Is(b[i]) || !Hexes.Is(b[i+1]) {
+			return s | ErrEscape, 0, st
+		}
+
+		r = decodeEscape(b, i, 2)
+		if r < 0 {
+			return s | Str(-r), 0, st
+		}
+
+		return s, r, i + 2
+	}
+
 	if b[i] != '\\' {
 		if !utf8.FullRune(b[i:]) {
 			return s | ErrBuffer, 0, st
@@ -185,9 +206,7 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 			return s | ErrRune, 0, st
 		}
 
-		i += size
-
-		return s, r, i
+		return s, r, i + size
 	}
 
 	i++
@@ -229,30 +248,13 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 		return s | ErrEscape, 0, st
 	}
 
-	decode := func(i, size int) (r rune) {
-		for j := 0; j < size; j++ {
-			c := b[i+j] | 0x20 // make lower
-			r = r << 4
-
-			if c >= '0' && c <= '9' {
-				r += rune(c - '0')
-			} else if c >= 'a' && c <= 'f' {
-				r += 10 + rune(c-'a')
-			} else {
-				return -rune(ErrEscape)
-			}
-		}
-
-		return r
-	}
-
 	if i+size > len(b) {
 		return s | ErrBuffer, 0, st
 	}
 
-	r = decode(i, size)
+	r = decodeEscape(b, i, size)
 	if r < 0 {
-		return s | -Str(r), 0, st
+		return s | Str(-r), 0, st
 	}
 
 	if utf16.IsSurrogate(r) && b[i-1] == 'u' {
@@ -261,9 +263,9 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 		}
 
 		if b[i+4] == '\\' && b[i+5] == 'u' {
-			r2 := decode(i+6, size)
+			r2 := decodeEscape(b, i+6, size)
 			if r2 < 0 {
-				return s | Str(r2), 0, st
+				return s | Str(-r2), 0, st
 			}
 
 			rr := utf16.DecodeRune(r, r2)
@@ -275,6 +277,23 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 	}
 
 	return s, r, i + size
+}
+
+func decodeEscape(b []byte, i, size int) (r rune) {
+	for j := 0; j < size; j++ {
+		c := b[i+j] | 0x20 // make lower
+		r = r << 4
+
+		if c >= '0' && c <= '9' {
+			r += rune(c - '0')
+		} else if c >= 'a' && c <= 'f' {
+			r += 10 + rune(c-'a')
+		} else {
+			return -rune(ErrEscape)
+		}
+	}
+
+	return r
 }
 
 func (s Str) Err() bool {

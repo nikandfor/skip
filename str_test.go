@@ -25,6 +25,8 @@ func TestStr(tb *testing.T) {
 		{Flags: Raw | Quo | Sqt, Want: Quo, I: -1, In: `"abc"`, Res: `abc`},
 		{Flags: Raw | Quo | Sqt, Want: Sqt, I: -1, In: `'abc'`, Res: `abc`},
 
+		{Flags: Raw | Quo | Sqt, Want: Quo, I: -1, In: `"a\x16c"`, Res: "a\x16c"},
+
 		{Flags: Quo, Want: ErrQuote, I: 0, In: "`abc`"},
 		{Flags: Raw, Want: ErrQuote, I: 0, In: `"abc"`},
 		{Flags: Sqt, Want: ErrQuote, I: 0, In: `"abc"`},

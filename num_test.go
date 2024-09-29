@@ -19,7 +19,7 @@ func TestNum(tb *testing.T) {
 		"inf",
 		"-infinity",
 	} {
-		n, i := Number([]byte(tc), 0)
+		n, i := Number([]byte(tc), 0, 0)
 		if !n.Ok() || i != len(tc) {
 			tb.Errorf("%s => %v %v", tc, n, i)
 		}

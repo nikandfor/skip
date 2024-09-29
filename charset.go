@@ -8,7 +8,7 @@ type (
 )
 
 var (
-	Whitespaces = NewCharset(" \t\n\r")
+	Whitespaces = NewCharset(" \t\n\v\r")
 	Decimals    = NewCharset("0123456789")
 	Octals      = NewCharset("01234567")
 	Nibbles     = NewCharset("0123")
@@ -28,6 +28,8 @@ var (
 
 	IDFirst = Letters.SetCopy('_')
 	IDRest  = IDFirst.OrCopy(Decimals.Wide())
+
+	ASCII32 = NewWidesetRange(0, 31)
 )
 
 func Spaces(b []byte, i int) int {
@@ -50,8 +52,8 @@ func NewCharsetRange(a, b byte) Charset {
 	return Charset(0).MergeRangeCopy(a, b)
 }
 
-func (x Wideset) Skip(b []byte, i int) int {
-	for i < len(b) && x.Is(b[i]) {
+func (x Wideset) SkipUntil(b []byte, i int) int {
+	for i < len(b) && !x.Is(b[i]) {
 		i++
 	}
 
@@ -98,6 +100,38 @@ func (x Wideset) MergeRangeCopy(a, b byte) Wideset {
 	return x
 }
 
+func (x *Wideset) Except(s string) {
+	*x = x.ExceptCopy(s)
+}
+
+func (x Wideset) ExceptCopy(s string) Wideset {
+	for _, c := range []byte(s) {
+		if c < 64 {
+			x[0].Unset(c)
+		} else {
+			x[1].Unset(c - 64)
+		}
+	}
+
+	return x
+}
+
+func (x *Wideset) ExceptRange(a, b byte) {
+	*x = x.ExceptRangeCopy(a, b)
+}
+
+func (x Wideset) ExceptRangeCopy(a, b byte) Wideset {
+	for c := a; c <= b; c++ {
+		if c < 64 {
+			x[0].Unset(c)
+		} else {
+			x[1].Unset(c - 64)
+		}
+	}
+
+	return x
+}
+
 func (x *Wideset) Set(b byte) {
 	*x = x.SetCopy(b)
 }
@@ -107,6 +141,20 @@ func (x Wideset) SetCopy(b byte) Wideset {
 		x[0].Set(b)
 	} else {
 		x[1].Set(b - 64)
+	}
+
+	return x
+}
+
+func (x *Wideset) Unset(b byte) {
+	*x = x.UnsetCopy(b)
+}
+
+func (x Wideset) UnsetCopy(b byte) Wideset {
+	if b < 64 {
+		x[0].Unset(b)
+	} else {
+		x[1].Unset(b - 64)
 	}
 
 	return x
@@ -123,11 +171,11 @@ func (x Wideset) OrCopy(y Wideset) Wideset {
 	return x
 }
 
-func (x *Wideset) Not(y Wideset) {
-	*x = x.NotCopy(y)
+func (x *Wideset) AndNot(y Wideset) {
+	*x = x.AndNotCopy(y)
 }
 
-func (x Wideset) NotCopy(y Wideset) Wideset {
+func (x Wideset) AndNotCopy(y Wideset) Wideset {
 	x[0] &^= y[0]
 	x[1] &^= y[1]
 
@@ -136,6 +184,14 @@ func (x Wideset) NotCopy(y Wideset) Wideset {
 
 func (x Charset) Skip(b []byte, i int) int {
 	for i < len(b) && x.Is(b[i]) {
+		i++
+	}
+
+	return i
+}
+
+func (x Charset) SkipUntil(b []byte, i int) int {
+	for i < len(b) && !x.Is(b[i]) {
 		i++
 	}
 
@@ -170,11 +226,47 @@ func (x Charset) MergeRangeCopy(a, b byte) Charset {
 	return x
 }
 
+func (x *Charset) Except(s string) {
+	*x = x.ExceptCopy(s)
+}
+
+func (x Charset) ExceptCopy(s string) Charset {
+	for _, c := range s {
+		x.Unset(byte(c))
+	}
+
+	return x
+}
+
+func (x *Charset) ExceptRange(a, b byte) {
+	*x = x.ExceptRangeCopy(a, b)
+}
+
+func (x Charset) ExceptRangeCopy(a, b byte) Charset {
+	for c := a; c <= b; c++ {
+		x.Unset(byte(c))
+	}
+
+	return x
+}
+
 func (x *Charset) Set(b byte) {
 	*x = x.SetCopy(b)
 }
 
 func (x Charset) SetCopy(b byte) Charset {
+	if b >= 64 {
+		panic(b)
+	}
+
+	return x | 1<<b
+}
+
+func (x *Charset) Unset(b byte) {
+	*x = x.UnsetCopy(b)
+}
+
+func (x Charset) UnsetCopy(b byte) Charset {
 	if b >= 64 {
 		panic(b)
 	}
@@ -190,11 +282,11 @@ func (x Charset) OrCopy(y Charset) Charset {
 	return x | y
 }
 
-func (x *Charset) Not(y Charset) {
+func (x *Charset) AndNot(y Charset) {
 	*x &^= y
 }
 
-func (x Charset) NotCopy(y Charset) Charset {
+func (x Charset) AndNotCopy(y Charset) Charset {
 	return x &^ y
 }
 

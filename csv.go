@@ -4,7 +4,8 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 	//	defer func() { log.Printf("csvSkip  from %v", loc.Caller(1)) }()
 	s |= CSV
 
-	var brk, skip Wideset
+	var brk Wideset
+	halt := NewWidesetRange(0, 31)
 	var q byte
 	i = st
 
@@ -13,13 +14,13 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		s |= Quo
 		q = '"'
 		brk.Set(q)
-		skip.Merge("\t\n\r")
+		halt.Not(Whitespaces.Wide())
 		i++
 	case flags.Is(Sqt) && b[i] == '\'':
 		s |= Sqt
 		q = '\''
 		brk.Set(q)
-		skip.Merge("\t\n\r")
+		halt.Not(Whitespaces.Wide())
 		i++
 	case flags.Is(Raw):
 		if byte(flags) == 0 {
@@ -29,9 +30,9 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		s |= Raw
 		brk.Set(byte(flags))
 		brk.Merge("\n\r")
-		skip.Merge("\t")
+		halt.Except("\t")
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk, skip)
+		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
 		if s.Err() {
 			return s, buf, l, i
 		}
@@ -53,7 +54,7 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 	for i < len(b) {
 		done := i
 
-		s, l, i = skipStrPart(b, i, l, s, flags, brk, skip)
+		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
 		if s.Err() {
 			return s, buf, i - st, i
 		}

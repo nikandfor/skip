@@ -22,25 +22,25 @@ const (
 	Base  = Bin | Oct | Hex
 )
 
-func Number(b []byte, st int) (n Num, i int) {
+func Number(b []byte, st int, flags Num) (n Num, i int) {
 	if st >= len(b) {
 		return
 	}
 
-	if n, i = Float(b, st); n != 0 {
+	if n, i = Float(b, st, flags); n != 0 {
 		return
 	}
 
-	if n, i = Integer(b, st); n != 0 {
+	if n, i = Integer(b, st, flags); n != 0 {
 		return
 	}
 
 	return 0, st
 }
 
-func Float(b []byte, st int) (n Num, i int) {
+func Float(b []byte, st int, flags Num) (n Num, i int) {
 	//	defer func() { log.Printf("Float    %d %q -> %d  => %v  from %v", st, b[st:], i, n, loc.Caller(1)) }()
-	if n, i = InfNaN(b, st); n != 0 {
+	if n, i = InfNaN(b, st, flags); n != 0 {
 		return
 	}
 
@@ -102,7 +102,7 @@ func Float(b []byte, st int) (n Num, i int) {
 	return n | Flt | Exp, i
 }
 
-func Integer(b []byte, st int) (n Num, i int) {
+func Integer(b []byte, st int, flags Num) (n Num, i int) {
 	//	defer func() { log.Printf("Int      %d %q -> %d  => %v  from %v", st, b[st:], i, n, loc.Caller(1)) }()
 	i = st
 
@@ -151,7 +151,7 @@ func Integer(b []byte, st int) (n Num, i int) {
 	return n | Int, i
 }
 
-func InfNaN(b []byte, st int) (n Num, i int) {
+func InfNaN(b []byte, st int, flags Num) (n Num, i int) {
 	i = st
 
 	if PrefixFold(b[i:], []byte("nan")) {
