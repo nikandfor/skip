@@ -10,18 +10,20 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 	i = st
 
 	switch {
-	case flags.Is(Quo) && b[i] == '"':
+	case flags.Is(Quo) && (b[i] == '"' || flags.Is(Continue)):
 		s |= Quo
 		q = '"'
 		brk.Set(q)
-		halt.Not(Whitespaces.Wide())
-		i++
-	case flags.Is(Sqt) && b[i] == '\'':
+		halt.AndNot(Whitespaces.Wide())
+
+		i += csel(flags.Is(Continue), 0, 1)
+	case flags.Is(Sqt) && (b[i] == '\'' || flags.Is(Continue)):
 		s |= Sqt
 		q = '\''
 		brk.Set(q)
-		halt.Not(Whitespaces.Wide())
-		i++
+		halt.AndNot(Whitespaces.Wide())
+
+		i += csel(flags.Is(Continue), 0, 1)
 	case flags.Is(Raw):
 		if byte(flags) == 0 {
 			flags |= ','
@@ -33,15 +35,14 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		halt.Except("\t")
 
 		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
+		if dec {
+			buf = append(buf, b[st:i]...)
+		}
 		if s.Err() {
 			return s, buf, l, i
 		}
 		if i < len(b) && !brk.Is(b[i]) {
 			return s | ErrChar, buf, l, i
-		}
-
-		if dec {
-			buf = append(buf, b[st:i]...)
 		}
 
 		i = csvSkipComma(b, i)
@@ -55,12 +56,11 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		done := i
 
 		s, l, i = skipStrPart(b, i, l, s, flags, brk.OrCopy(halt))
-		if s.Err() {
-			return s, buf, i - st, i
-		}
-
 		if dec {
 			buf = append(buf, b[done:i]...)
+		}
+		if s.Err() {
+			return s, buf, i - st, i
 		}
 
 		if i == len(b) || b[i] != q {
@@ -80,7 +80,7 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		break
 	}
 	if i == len(b) || b[i] != q {
-		return s | ErrQuote, buf, l, i
+		return s | ErrChar, buf, l, i
 	}
 
 	i++

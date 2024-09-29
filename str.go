@@ -16,19 +16,22 @@ const (
 	Quo Str = 1 << (iota + 8)
 	Sqt
 	Raw
-	CSV
+	_
 
+	CSV
+	URL
+	_
 	Continue
-	_
-	_
-	_
 
 	ErrChar
 	ErrRune
 	ErrEscape
 	ErrQuote
+
 	ErrIndex
 	ErrBuffer
+	_
+	_
 
 	StrErr = ErrChar | ErrRune | ErrEscape | ErrQuote | ErrIndex | ErrBuffer
 )
@@ -60,6 +63,9 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 	if flags.Is(CSV) {
 		return csvSkip(b, st, flags, buf, dec)
 	}
+	if flags.Is(URL) {
+		return urlSkip(b, st, flags, buf, dec)
+	}
 
 	//	defer func() { log.Printf("skipStr  %d (%s) -> %d  => %v  from %v", st, b, i, s, loc.Caller(1)) }()
 	s, brk, halt, fin, i := openStr(b, st, flags)
@@ -83,7 +89,6 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 		if i == len(b) || fin.Is(b[i]) {
 			break
 		}
-
 		if halt.Is(b[i]) {
 			return s | ErrChar, buf, l, i
 		}
@@ -119,7 +124,7 @@ func openStr(b []byte, st int, flags Str) (s Str, brk, halt, fin Wideset, i int)
 		s |= Raw
 		fin.Merge("`")
 		brk.Merge("`")
-		halt.Not(Whitespaces.Wide())
+		halt.AndNot(Whitespaces.Wide())
 
 		i += csel(flags.Is(Continue), 0, 1)
 	case flags.Is(Quo) && (b[i] == '"' || flags.Is(Continue)):
@@ -175,25 +180,6 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 	i = st
 	if i >= len(b) {
 		return s | ErrIndex, 0, st
-	}
-
-	if b[i] == '%' {
-		i++
-
-		if i+1 >= len(b) {
-			return s | ErrBuffer, 0, st
-		}
-
-		if !Hexes.Is(b[i]) || !Hexes.Is(b[i+1]) {
-			return s | ErrEscape, 0, st
-		}
-
-		r = decodeEscape(b, i, 2)
-		if r < 0 {
-			return s | Str(-r), 0, st
-		}
-
-		return s, r, i + 2
 	}
 
 	if b[i] != '\\' {
