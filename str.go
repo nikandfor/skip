@@ -36,10 +36,11 @@ const (
 	StrErr = ErrChar | ErrRune | ErrEscape | ErrQuote | ErrIndex | ErrBuffer
 )
 
-var esc2rune = []rune{
+var esc2char = []byte{
 	'\\': '\\',
 	'\'': '\'',
 	'"':  '"',
+	'/':  '/',
 	'a':  '\a',
 	'b':  '\b',
 	'f':  '\f',
@@ -232,9 +233,11 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 		}
 
 		return s, r, i + size
-	case '\\', '\'', '"', 'a', 'b', 'f', 'n', 'r', 't', 'v':
-		return s, esc2rune[b[i]], i + 1
 	default:
+		if x := esc2char[b[i]]; x != 0 {
+			return s, rune(x), i + 1
+		}
+
 		return s | ErrEscape, 0, st
 	}
 

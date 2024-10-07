@@ -67,6 +67,8 @@ func TestStr(tb *testing.T) {
 
 		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},
 		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
+
+		{Flags: Quo | Sqt, Want: Quo, End: -1, In: `"a\/b"`, Res: `a/b`},
 	} {
 		var pref []byte
 		var in []byte
@@ -90,7 +92,7 @@ func TestStr(tb *testing.T) {
 		ll := utf8.RuneCountInString(tc.Res)
 
 		s, bs, rs, i := String(in, st, tc.Flags)
-		assert(tb, s == tc.Want, "s %#v, wanted %#v", s, tc.Want)
+		assert(tb, s == tc.Want, "s %v (%#[1]v), wanted %v (%#[2]v)", s, tc.Want)
 		assert(tb, i == end, "index %v, wanted %v  of %v", i, end, 2*len(pref)+len(tc.In))
 		assert(tb, bs == len(tc.Res), "bytes %v, wanted %v", bs, len(tc.Res))
 		assert(tb, rs == ll, "runes %v, wanted %v", rs, ll)
@@ -102,7 +104,7 @@ func TestStr(tb *testing.T) {
 		}
 
 		s, buf, rs, i = DecodeString(in, st, tc.Flags, buf[:0])
-		assert(tb, s == tc.Want, "s %v, wanted %v", s, tc.Want)
+		assert(tb, s == tc.Want, "s %v (%#[1]v), wanted %v (%#[2]v)", s, tc.Want)
 		assert(tb, i == end, "index %v, wanted %v  of %v", i-len(pref), end, len(tc.In))
 		assert(tb, rs == ll, "runes %v, wanted %v", rs, ll)
 		assert(tb, Equal(buf, []byte(tc.Res)), "res %q", buf)
