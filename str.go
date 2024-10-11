@@ -13,27 +13,27 @@ type (
 const (
 	// first byte is arg
 
-	Quo Str = 1 << (iota + 8)
-	Sqt
-	Raw
+	Quo     Str = 1 << (iota + 8) // double quoted string (")
+	Sqt                           // single quoted string (')
+	Raw                           // backquoted string, like Go raw string (`)
+	Unicode                       // unicode
+
+	CSV // CSV use quoting
+	URL // decode url escapes (%xx)
+	_
+	Continue // means string parsing can be continued from the middle of it. Refer to examples.
+
+	ErrSymbol // improper symbol
+	ErrRune   // malformed rune
+	ErrEscape // malformed escape sequence
+	ErrQuote  // malformed quoting
+
+	ErrIndex  // index out of bounds
+	ErrBuffer // short buffer. decoding can be continued when more data is added to the buffer.
+	_
 	_
 
-	CSV
-	URL
-	_
-	Continue
-
-	ErrChar
-	ErrRune
-	ErrEscape
-	ErrQuote
-
-	ErrIndex
-	ErrBuffer
-	_
-	_
-
-	StrErr = ErrChar | ErrRune | ErrEscape | ErrQuote | ErrIndex | ErrBuffer
+	StrErr = ErrSymbol | ErrRune | ErrEscape | ErrQuote | ErrIndex | ErrBuffer
 )
 
 var esc2char = []byte{
@@ -50,11 +50,24 @@ var esc2char = []byte{
 	'v':  '\v',
 }
 
+// DecodeString unquotes and decodes string handling escape sequences.
+// It does the same as String but also decodes and returns the string appending it to buf.
+//
+// If decoding is continued buf must be passed back as it was returned.
 func DecodeString(b []byte, st int, flags Str, buf []byte) (s Str, _ []byte, rs, i int) {
 	s, buf, _, rs, i = skipString(b, st, flags, buf, true)
 	return s, buf, rs, i
 }
 
+// String skips and validates the string starting at index st.
+// It returns state, number of bytes needed to store string in utf8, number of runes, and the end position in the b buffer.
+//
+// flags must be set to strings we accept: Quo, Sqt, Raw, or any combination of them.
+// If CSV is set it uses csv parsing and unescaping rules.
+// If URL is set it uses url parsing and unescaping rules. URL do not respect Quo, Sqt, and Raw flags.
+//
+// If Continue returned it means decoding can be continued if error is fixed.
+// i must be used as st and s as flags.
 func String(b []byte, st int, flags Str) (s Str, bs, rs, i int) {
 	s, _, bs, rs, i = skipString(b, st, flags, nil, false)
 	return s, bs, rs, i
@@ -92,7 +105,7 @@ func skipString(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []b
 			break
 		}
 		if halt.Is(b[i]) {
-			return s | ErrChar, buf, bs, rs, i
+			return s | ErrSymbol, buf, bs, rs, i
 		}
 
 		s, r, i = decodeStrChar(b, i, s, flags)
@@ -173,6 +186,7 @@ func skipStrPart(b []byte, st, l int, s, flags Str, brk Wideset) (ss Str, ll, i 
 			return s | ErrRune, l, i
 		}
 
+		s |= Unicode
 		i += size
 		l++
 	}
@@ -197,7 +211,7 @@ func decodeStrChar(b []byte, st int, s, flags Str) (ss Str, r rune, i int) {
 			return s | ErrRune, 0, st
 		}
 
-		return s, r, i + size
+		return s | Unicode, r, i + size
 	}
 
 	i++
@@ -338,7 +352,7 @@ func (s Str) Error() string {
 		comma = true
 	}
 
-	add(ErrChar, "bad char")
+	add(ErrSymbol, "bad char")
 	add(ErrRune, "bad rune")
 	add(ErrEscape, "bad escape")
 	add(ErrQuote, "bad quote")

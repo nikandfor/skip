@@ -5,23 +5,25 @@ type (
 )
 
 const (
-	Neg Num = 1 << iota
-	NaN
-	Inf
-	Int
-	Flt
+	Neg Num = 1 << iota // number is negative
+	NaN                 // it's NaN
+	Inf                 // it's Inf or -Inf
+	Int                 // It's integer
+	Flt                 // It's float
 
-	Bin
-	Oct
-	Hex
+	Bin // integer is in binary format: 0bxxxx_xxxx
+	Oct // integer is in octal format: 0oxxx or 0xxx
+	Hex // integer or hex is in hex format. float hex format implies 'p' exponent form
 
-	ExpNeg
-	Exp
+	ExpNeg // negative exponent
+	Exp    // there is exponent part
 
 	NumOk = Int | Flt | NaN | Inf
 	Base  = Bin | Oct | Hex
 )
 
+// Number validates and finds the end of a rumber.
+// Number do not currently accept any flags.
 func Number(b []byte, st int, flags Num) (n Num, i int) {
 	if st >= len(b) {
 		return

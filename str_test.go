@@ -34,17 +34,17 @@ func TestStr(tb *testing.T) {
 		{Flags: Sqt, Want: ErrQuote, End: 0, In: `"abc"`},
 
 		{Flags: Raw | Quo | Sqt, Want: Raw | ErrBuffer, End: 8, In: "`abc\"", Res: "abc\"\n\n\t"},
-		{Flags: Raw | Quo | Sqt, Want: Quo | ErrChar, End: 5, In: "\"abc`", Res: "abc`"},
-		{Flags: Raw | Quo | Sqt, Want: Quo | ErrChar, End: 5, In: "\"abc'", Res: "abc'"},
+		{Flags: Raw | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc`", Res: "abc`"},
+		{Flags: Raw | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc'", Res: "abc'"},
 
 		{Flags: Raw | Quo | Sqt, Want: Raw, End: -1, In: "`ab\nc`", Res: "ab\nc"},
 		{Flags: Raw | Quo | Sqt, Want: Raw, End: -1, In: "`a\"b\n\"c`", Res: "a\"b\n\"c"},
 		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `"a\nb\tc"`, Res: "a\nb\tc"},
 		{Flags: Raw | Quo | Sqt, Want: Sqt, End: -1, In: `'a\nb\tc'`, Res: "a\nb\tc"},
 
-		{Flags: Raw | Quo | Sqt, Want: Raw, End: -1, In: "`абвгд`", Res: `абвгд`},
-		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `"абвгд"`, Res: `абвгд`},
-		{Flags: Raw | Quo | Sqt, Want: Sqt, End: -1, In: `'абвгд'`, Res: `абвгд`},
+		{Flags: Raw | Quo | Sqt, Want: Raw | Unicode, End: -1, In: "`абвгд`", Res: `абвгд`},
+		{Flags: Raw | Quo | Sqt, Want: Quo | Unicode, End: -1, In: `"абвгд"`, Res: `абвгд`},
+		{Flags: Raw | Quo | Sqt, Want: Sqt | Unicode, End: -1, In: `'абвгд'`, Res: `абвгд`},
 
 		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
 		{Flags: Raw | Quo | Sqt, Want: Sqt, End: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
@@ -62,7 +62,7 @@ func TestStr(tb *testing.T) {
 		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 14, End: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
 
 		{Flags: Quo | Sqt | Raw, Want: Quo, End: -1, In: `"%20%33"`, Res: `%20%33`},
-		{Flags: URL, Want: URL | ErrChar, End: -1, In: `"%20%33"`, Res: `" 3"`},
+		{Flags: URL, Want: URL | ErrSymbol, End: -1, In: `"%20%33"`, Res: `" 3"`},
 		{Flags: URL, Want: URL, St: 8, End: 12, In: `abc=def&qw+e=asd&zxc`, Res: `qw e`, NoWrap: true},
 
 		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},

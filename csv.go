@@ -43,10 +43,10 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 			return s, buf, bs, rs, i
 		}
 		if i < len(b) && !brk.Is(b[i]) {
-			return s | ErrChar, buf, bs, rs, i
+			return s | ErrSymbol, buf, bs, rs, i
 		}
 
-		i = csvSkipComma(b, i)
+		i = csvSkipComma(b, i, byte(flags))
 
 		return s | CSV, buf, bs, rs, i
 	default:
@@ -83,18 +83,18 @@ func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 		break
 	}
 	if i == len(b) || b[i] != q {
-		return s | ErrChar, buf, bs, rs, i
+		return s | ErrSymbol, buf, bs, rs, i
 	}
 
 	i++
 
-	i = csvSkipComma(b, i)
+	i = csvSkipComma(b, i, byte(flags))
 
 	return s, buf, bs, rs, i
 }
 
-func csvSkipComma(b []byte, i int) int {
-	if i < len(b) && b[i] == ',' {
+func csvSkipComma(b []byte, i int, comma byte) int {
+	if i < len(b) && b[i] == comma {
 		return i + 1
 	}
 

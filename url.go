@@ -30,7 +30,7 @@ func urlSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte
 			break
 		}
 		if halt.Is(b[i]) {
-			return s | ErrChar, buf, bs, rs, i
+			return s | ErrSymbol, buf, bs, rs, i
 		}
 
 		s, r, i = decodeURLChar(b, i, s, flags)
