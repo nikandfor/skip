@@ -52,6 +52,14 @@ func NewCharsetRange(a, b byte) Charset {
 	return Charset(0).MergeRangeCopy(a, b)
 }
 
+func (x Wideset) Skip(b []byte, i int) int {
+	for i < len(b) && x.Is(b[i]) {
+		i++
+	}
+
+	return i
+}
+
 func (x Wideset) SkipUntil(b []byte, i int) int {
 	for i < len(b) && !x.Is(b[i]) {
 		i++

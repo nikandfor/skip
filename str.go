@@ -352,7 +352,7 @@ func (s Str) Error() string {
 		comma = true
 	}
 
-	add(ErrSymbol, "bad char")
+	add(ErrSymbol, "bad symbol")
 	add(ErrRune, "bad rune")
 	add(ErrEscape, "bad escape")
 	add(ErrQuote, "bad quote")

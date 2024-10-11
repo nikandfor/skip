@@ -1,6 +1,7 @@
 package skip
 
 import (
+	"fmt"
 	"unicode"
 	"unicode/utf8"
 )
@@ -23,7 +24,7 @@ const (
 
 // Identifier validates and finds the end of an identifier.
 // Identifier do not currently accept any flags.
-func Identifier(b []byte, st int) (x ID, i int) {
+func Identifier(b []byte, st int, flags ID) (x ID, i int) {
 	i = st
 
 	if i == len(b) || (b[i] >= '0' && b[i] <= '9') {
@@ -39,8 +40,8 @@ func Identifier(b []byte, st int) (x ID, i int) {
 
 		i++
 	} else {
-		r, s := utf8.DecodeRune(b[i:])
-		if s == 1 && r == utf8.RuneError {
+		r, size := utf8.DecodeRune(b[i:])
+		if size == 1 && r == utf8.RuneError {
 			return x | IDErrRune, i
 		}
 		if unicode.IsUpper(r) {
@@ -51,11 +52,14 @@ func Identifier(b []byte, st int) (x ID, i int) {
 
 		x |= IDUnicode
 
-		i += s
+		i += size
 	}
 
 	for i < len(b) {
 		if b[i] < utf8.RuneSelf {
+			if Whitespaces.Is(b[i]) || unicode.IsSymbol(rune(b[i])) {
+				return x, i
+			}
 			if !IDRest.Is(b[i]) {
 				return x | IDErrSymbol, i
 			}
@@ -65,10 +69,13 @@ func Identifier(b []byte, st int) (x ID, i int) {
 		}
 
 		r, size := utf8.DecodeRune(b[i:])
-		if r == utf8.RuneError {
+		if size == 1 && r == utf8.RuneError {
 			return x | IDErrRune, i
 		}
-		if !unicode.IsSymbol(r) {
+		if unicode.IsSymbol(rune(b[i])) {
+			return x, i
+		}
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) { // _ is runeself
 			return x | IDErrSymbol, i
 		}
 
@@ -89,4 +96,32 @@ func (id ID) Is(f ID) bool {
 
 func (id ID) Any(f ID) bool {
 	return id&f != 0
+}
+
+func (id ID) Error() string {
+	if !id.Err() {
+		return "ok"
+	}
+
+	r := ""
+	comma := false
+
+	add := func(e ID, t string) {
+		if !id.Is(e) {
+			return
+		}
+
+		r += csel(comma, ", ", "")
+		r += t
+		comma = true
+	}
+
+	add(IDErrSymbol, "bad symbol")
+	add(IDErrRune, "bad rune")
+
+	if r == "" {
+		r = fmt.Sprintf("%#x", int(id))
+	}
+
+	return r
 }
