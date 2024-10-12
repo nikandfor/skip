@@ -11,15 +11,26 @@ type (
 )
 
 const (
-	_         ID = 1 << iota
+	// first byte is arg
+
+	IDPrefix  ID = 1 << (8 + iota)
 	IDPrivate    // lowercase first letter
 	IDPublic     // uppercase first letter
 	IDUnicode    // unicode
 
+	_
+	_
+	_
+	_
+
+	IDErrPrefix // prefix doesn't match
 	IDErrSymbol // improper symbol
 	IDErrRune   // malformed rune
+	IDErrIndex  // index out of bounds
 
-	IDErr = IDErrRune | IDErrSymbol
+	IDErrBuffer // short buffer
+
+	IDErr = IDPrefix | IDErrSymbol | IDErrRune | IDErrIndex | IDErrBuffer
 )
 
 // Identifier validates and finds the end of an identifier.
@@ -27,11 +38,27 @@ const (
 func Identifier(b []byte, st int, flags ID) (x ID, i int) {
 	i = st
 
-	if i == len(b) || (b[i] >= '0' && b[i] <= '9') {
-		return x | IDErrSymbol, i
+	if i == len(b) {
+		return x | IDErrIndex, st
 	}
 
-	if b[i] < 0x80 {
+	if flags.Is(IDPrefix) {
+		if b[i] != byte(flags) {
+			return x | IDErrPrefix, st
+		}
+
+		i++
+	}
+
+	if i == len(b) {
+		return x | IDErrBuffer, st
+	}
+
+	if b[i] < utf8.RuneSelf {
+		if !IDFirst.Is(b[i]) {
+			return x | IDErrSymbol, i
+		}
+
 		if Upper.Is(b[i]) {
 			x |= IDPublic
 		} else {
@@ -44,6 +71,10 @@ func Identifier(b []byte, st int, flags ID) (x ID, i int) {
 		if size == 1 && r == utf8.RuneError {
 			return x | IDErrRune, i
 		}
+		if !unicode.IsLetter(r) {
+			return x | IDErrSymbol, i
+		}
+
 		if unicode.IsUpper(r) {
 			x |= IDPublic
 		} else {
@@ -51,20 +82,17 @@ func Identifier(b []byte, st int, flags ID) (x ID, i int) {
 		}
 
 		x |= IDUnicode
-
 		i += size
 	}
 
 	for i < len(b) {
 		if b[i] < utf8.RuneSelf {
-			if Whitespaces.Is(b[i]) || unicode.IsSymbol(rune(b[i])) {
-				return x, i
-			}
 			if !IDRest.Is(b[i]) {
-				return x | IDErrSymbol, i
+				return x, i
 			}
 
 			i++
+
 			continue
 		}
 
@@ -72,11 +100,8 @@ func Identifier(b []byte, st int, flags ID) (x ID, i int) {
 		if size == 1 && r == utf8.RuneError {
 			return x | IDErrRune, i
 		}
-		if unicode.IsSymbol(rune(b[i])) {
+		if !unicode.IsLetter(r) && !unicode.IsNumber(r) { // _ is < utf8.RuneSelf
 			return x, i
-		}
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) { // _ is runeself
-			return x | IDErrSymbol, i
 		}
 
 		x |= IDUnicode

@@ -13,7 +13,7 @@ type (
 const (
 	// first byte is arg
 
-	Quo     Str = 1 << (iota + 8) // double quoted string (")
+	Quo     Str = 1 << (8 + iota) // double quoted string (")
 	Sqt                           // single quoted string (')
 	Raw                           // backquoted string, like Go raw string (`)
 	Unicode                       // unicode
