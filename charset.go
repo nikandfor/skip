@@ -1,6 +1,9 @@
 package skip
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 type (
 	Charset uint64
@@ -63,6 +66,22 @@ func (x Wideset) Skip(b []byte, i int) int {
 func (x Wideset) SkipUntil(b []byte, i int) int {
 	for i < len(b) && !x.Is(b[i]) {
 		i++
+	}
+
+	return i
+}
+
+func (x Wideset) SkipUntilUTF8(b []byte, i int) int {
+	for i < len(b) {
+		if b[i] < utf8.RuneSelf {
+			if x.Is(b[i]) {
+				return i
+			}
+			i++
+		} else {
+			_, size := utf8.DecodeRune(b[i:])
+			i += size
+		}
 	}
 
 	return i
@@ -201,6 +220,26 @@ func (x Charset) Skip(b []byte, i int) int {
 func (x Charset) SkipUntil(b []byte, i int) int {
 	for i < len(b) && !x.Is(b[i]) {
 		i++
+	}
+
+	return i
+}
+
+func (x Charset) SkipUntilUTF8(b []byte, i int) int {
+	for i < len(b) {
+		if b[i] < utf8.RuneSelf {
+			if x.Is(b[i]) {
+				return i
+			}
+			i++
+		} else {
+			r, size := utf8.DecodeRune(b[i:])
+			if r == utf8.RuneError && size == 1 || x.Is('\n') && (r == '\u2028' || r == '\u2029') {
+				return i
+			}
+
+			i += size
+		}
 	}
 
 	return i

@@ -7,21 +7,27 @@ import (
 )
 
 type (
-	Str int
+	Str int64
 )
 
 const (
 	// first byte is arg
 
-	Quo     Str = 1 << (8 + iota) // double quoted string (")
-	Sqt                           // single quoted string (')
-	Raw                           // backquoted string, like Go raw string (`)
-	Unicode                       // unicode
+	_ Str = 1 << (8 + iota - 1)
 
-	CSV // CSV use quoting
-	URL // decode url escapes (%xx)
-	_
-	Continue // means string parsing can be continued from the middle of it. Refer to examples.
+	// second byte
+
+	Raw // quoteless
+	Quo // double quotes (")
+	Sqt // single quotes (')
+	Bqt // backquotes (`)
+
+	Arg
+	CSV  // CSV use escaping
+	URL  // decode url escapes (%xx)
+	YAML // yaml style
+
+	// third byte
 
 	ErrSymbol // improper symbol
 	ErrRune   // malformed rune
@@ -33,21 +39,51 @@ const (
 	_
 	_
 
+	// fourth
+
+	EscDouble
+	EscNothing
+	EscZero
+	EscBackslash
+
+	EscPercent
+	EscXX
+	EscU4
+	EscU8
+
+	// fifth byte
+
+	EscUpper
+	Unicode
+	Continue // Decoding may be continued. Refer to examples.
+	_
+
+	_
+	_
+	_
+	_
+
+	// sixth byte
+
+	strNewLine
+
+	// combinations
+
 	StrErr = ErrSymbol | ErrRune | ErrEscape | ErrQuote | ErrIndex | ErrBuffer
 )
 
 var esc2char = []byte{
 	'\\': '\\',
-	'\'': '\'',
-	'"':  '"',
 	'/':  '/',
+	'"':  '"',
+	'\'': '\'',
 	'a':  '\a',
 	'b':  '\b',
-	'f':  '\f',
-	'n':  '\n',
-	'r':  '\r',
 	't':  '\t',
+	'n':  '\n',
 	'v':  '\v',
+	'f':  '\f',
+	'r':  '\r',
 }
 
 // DecodeString unquotes and decodes string handling escape sequences.
@@ -62,9 +98,9 @@ func DecodeString(b []byte, st int, flags Str, buf []byte) (s Str, _ []byte, rs,
 // String skips and validates the string starting at index st.
 // It returns state, number of bytes needed to store string in utf8, number of runes, and the end position in the b buffer.
 //
-// flags must be set to strings we accept: Quo, Sqt, Raw, or any combination of them.
+// flags must be set to strings we accept: Quo, Sqt, Bqt, Raw, or any combination of them.
 // If CSV is set it uses csv parsing and unescaping rules.
-// If URL is set it uses url parsing and unescaping rules. URL do not respect Quo, Sqt, and Raw flags.
+// If URL is set it uses url parsing and unescaping rules. URL doesn't respect Quo, Sqt, Bqt, and Raw flags.
 //
 // If Continue returned it means decoding can be continued if error is fixed.
 // i must be used as st and s as flags.
@@ -138,8 +174,8 @@ func openStr(b []byte, st int, flags Str) (s Str, brk, halt, fin Wideset, i int)
 	switch {
 	case i >= len(b):
 		s |= ErrIndex
-	case flags.Is(Raw) && (b[i] == '`' || flags.Is(Continue)):
-		s |= Raw
+	case flags.Is(Bqt) && (b[i] == '`' || flags.Is(Continue)):
+		s |= Bqt
 		fin.Merge("`")
 		brk.Merge("`")
 		halt.AndNot(Whitespaces.Wide())

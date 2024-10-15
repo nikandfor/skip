@@ -23,45 +23,45 @@ func TestStr(tb *testing.T) {
 	var failj int
 
 	for j, tc := range []TC{
-		{Flags: Raw | Quo | Sqt, Want: Raw, End: -1, In: "`abc`", Res: `abc`},
-		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `"abc"`, Res: `abc`},
-		{Flags: Raw | Quo | Sqt, Want: Sqt, End: -1, In: `'abc'`, Res: `abc`},
+		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`abc`", Res: `abc`},
+		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"abc"`, Res: `abc`},
+		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'abc'`, Res: `abc`},
 
-		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `"a\x16c"`, Res: "a\x16c"},
+		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"a\x16c"`, Res: "a\x16c"},
 
 		{Flags: Quo, Want: ErrQuote, End: 0, In: "`abc`"},
-		{Flags: Raw, Want: ErrQuote, End: 0, In: `"abc"`},
+		{Flags: Bqt, Want: ErrQuote, End: 0, In: `"abc"`},
 		{Flags: Sqt, Want: ErrQuote, End: 0, In: `"abc"`},
 
-		{Flags: Raw | Quo | Sqt, Want: Raw | ErrBuffer, End: 8, In: "`abc\"", Res: "abc\"\n\n\t"},
-		{Flags: Raw | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc`", Res: "abc`"},
-		{Flags: Raw | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc'", Res: "abc'"},
+		{Flags: Bqt | Quo | Sqt, Want: Bqt | ErrBuffer, End: 8, In: "`abc\"", Res: "abc\"\n\n\t"},
+		{Flags: Bqt | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc`", Res: "abc`"},
+		{Flags: Bqt | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc'", Res: "abc'"},
 
-		{Flags: Raw | Quo | Sqt, Want: Raw, End: -1, In: "`ab\nc`", Res: "ab\nc"},
-		{Flags: Raw | Quo | Sqt, Want: Raw, End: -1, In: "`a\"b\n\"c`", Res: "a\"b\n\"c"},
-		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `"a\nb\tc"`, Res: "a\nb\tc"},
-		{Flags: Raw | Quo | Sqt, Want: Sqt, End: -1, In: `'a\nb\tc'`, Res: "a\nb\tc"},
+		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`ab\nc`", Res: "ab\nc"},
+		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`a\"b\n\"c`", Res: "a\"b\n\"c"},
+		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"a\nb\tc"`, Res: "a\nb\tc"},
+		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'a\nb\tc'`, Res: "a\nb\tc"},
 
-		{Flags: Raw | Quo | Sqt, Want: Raw | Unicode, End: -1, In: "`абвгд`", Res: `абвгд`},
-		{Flags: Raw | Quo | Sqt, Want: Quo | Unicode, End: -1, In: `"абвгд"`, Res: `абвгд`},
-		{Flags: Raw | Quo | Sqt, Want: Sqt | Unicode, End: -1, In: `'абвгд'`, Res: `абвгд`},
+		{Flags: Bqt | Quo | Sqt, Want: Bqt | Unicode, End: -1, In: "`абвгд`", Res: `абвгд`},
+		{Flags: Bqt | Quo | Sqt, Want: Quo | Unicode, End: -1, In: `"абвгд"`, Res: `абвгд`},
+		{Flags: Bqt | Quo | Sqt, Want: Sqt | Unicode, End: -1, In: `'абвгд'`, Res: `абвгд`},
 
-		{Flags: Raw | Quo | Sqt, Want: Quo, End: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
-		{Flags: Raw | Quo | Sqt, Want: Sqt, End: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
+		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
+		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
 
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`},
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`, NoWrap: true},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`, NoWrap: true},
 
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, End: 12, In: `"abc""d""ef"`, Res: `abc"d"ef`},
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, End: 6, In: `abc ww`, Res: `abc ww`},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, End: 12, In: `"abc""d""ef"`, Res: `abc"d"ef`},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 6, In: `abc ww`, Res: `abc ww`},
 
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, St: 6, End: 12, In: `"abc","def","qwe"`, Res: `def`},
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 6, End: 14, In: `a b c, d e f ,q w e`, Res: ` d e f `},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, St: 6, End: 12, In: `"abc","def","qwe"`, Res: `def`},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 6, End: 14, In: `a b c, d e f ,q w e`, Res: ` d e f `},
 
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Quo, St: 12, End: 17, In: `"abc","def","qwe"`, Res: `qwe`},
-		{Flags: CSV | Quo | Sqt | Raw | ',', Want: CSV | Raw, St: 14, End: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, St: 12, End: 17, In: `"abc","def","qwe"`, Res: `qwe`},
+		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 14, End: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
 
-		{Flags: Quo | Sqt | Raw, Want: Quo, End: -1, In: `"%20%33"`, Res: `%20%33`},
+		{Flags: Quo | Sqt | Bqt, Want: Quo, End: -1, In: `"%20%33"`, Res: `%20%33`},
 		{Flags: URL, Want: URL | ErrSymbol, End: -1, In: `"%20%33"`, Res: `" 3"`},
 		{Flags: URL, Want: URL, St: 8, End: 12, In: `abc=def&qw+e=asd&zxc`, Res: `qw e`, NoWrap: true},
 
