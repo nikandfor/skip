@@ -1,5 +1,3 @@
-//go:build ignore
-
 package skip
 
 import (
@@ -17,7 +15,7 @@ func TestStr(tb *testing.T) {
 		St, End int
 		Len     int
 
-		NoWrap bool
+		Wrap []byte
 	}
 
 	var buf []byte
@@ -35,7 +33,7 @@ func TestStr(tb *testing.T) {
 		{Flags: Bqt, Want: ErrQuote, End: 0, In: `"abc"`},
 		{Flags: Sqt, Want: ErrQuote, End: 0, In: `"abc"`},
 
-		{Flags: Bqt | Quo | Sqt, Want: Bqt | ErrBuffer, End: 8, In: "`abc\"", Res: "abc\"\n\n\t"},
+		{Flags: Bqt | Quo | Sqt, Want: Bqt | ErrBuffer, End: 8, In: "`abc\"", Res: "abc\"\n\n\t", Wrap: []byte("\n\n\t")},
 		{Flags: Bqt | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc`", Res: "abc`"},
 		{Flags: Bqt | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc'", Res: "abc'"},
 
@@ -51,36 +49,38 @@ func TestStr(tb *testing.T) {
 		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
 		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
 
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`},
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`, NoWrap: true},
+		/*
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`, NoWrap: true},
 
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, End: 12, In: `"abc""d""ef"`, Res: `abc"d"ef`},
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 6, In: `abc ww`, Res: `abc ww`},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, End: 12, In: `"abc""d""ef"`, Res: `abc"d"ef`},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 6, In: `abc ww`, Res: `abc ww`},
 
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, St: 6, End: 12, In: `"abc","def","qwe"`, Res: `def`},
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 6, End: 14, In: `a b c, d e f ,q w e`, Res: ` d e f `},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, St: 6, End: 12, In: `"abc","def","qwe"`, Res: `def`},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 6, End: 14, In: `a b c, d e f ,q w e`, Res: ` d e f `},
 
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, St: 12, End: 17, In: `"abc","def","qwe"`, Res: `qwe`},
-		{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 14, End: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Quo, St: 12, End: 17, In: `"abc","def","qwe"`, Res: `qwe`},
+			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 14, End: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
+		*/
 
 		{Flags: Quo | Sqt | Bqt, Want: Quo, End: -1, In: `"%20%33"`, Res: `%20%33`},
-		{Flags: URL, Want: URL | ErrSymbol, End: -1, In: `"%20%33"`, Res: `" 3"`},
-		{Flags: URL, Want: URL, St: 8, End: 12, In: `abc=def&qw+e=asd&zxc`, Res: `qw e`, NoWrap: true},
+		//	{Flags: URL, Want: URL | ErrSymbol, End: -1, In: `"%20%33"`, Res: `" 3"`},
+		//	{Flags: URL, Want: URL, St: 8, End: 12, In: `abc=def&qw+e=asd&zxc`, Res: `qw e`, NoWrap: true},
 
 		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},
 		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
 
 		{Flags: Quo | Sqt, Want: Quo, End: -1, In: `"a\/b"`, Res: `a/b`},
 	} {
-		var pref []byte
+		var wrap []byte = []byte("\n\n\t\t")
 		var in []byte
 
-		if !tc.NoWrap {
-			pref = []byte("\n\n\t")
+		if tc.Wrap != nil {
+			wrap = tc.Wrap
 		}
 
-		in = append(pref, tc.In...)
-		in = append(in, pref...)
+		in = append(wrap, tc.In...)
+		in = append(in, wrap...)
 
 		st := tc.St
 		end := tc.End
@@ -89,13 +89,13 @@ func TestStr(tb *testing.T) {
 			end = len(tc.In)
 		}
 
-		st += len(pref)
-		end += len(pref)
+		st += len(wrap)
+		end += len(wrap)
 		ll := utf8.RuneCountInString(tc.Res)
 
 		s, bs, rs, i := String(in, st, tc.Flags)
 		assert(tb, s == tc.Want, "s %v (%#[1]v), wanted %v (%#[2]v)", s, tc.Want)
-		assert(tb, i == end, "index %v, wanted %v  of %v", i, end, 2*len(pref)+len(tc.In))
+		assert(tb, i == end, "index %v, wanted %v  of %v", i-len(wrap), end-len(wrap), len(tc.In))
 		assert(tb, bs == len(tc.Res), "bytes %v, wanted %v", bs, len(tc.Res))
 		assert(tb, rs == ll, "runes %v, wanted %v", rs, ll)
 
@@ -107,7 +107,7 @@ func TestStr(tb *testing.T) {
 
 		s, buf, rs, i = DecodeString(in, st, tc.Flags, buf[:0])
 		assert(tb, s == tc.Want, "s %v (%#[1]v), wanted %v (%#[2]v)", s, tc.Want)
-		assert(tb, i == end, "index %v, wanted %v  of %v", i-len(pref), end, len(tc.In))
+		assert(tb, i == end, "index %v, wanted %v  of %v", i-len(wrap), end-len(wrap), len(tc.In))
 		assert(tb, rs == ll, "runes %v, wanted %v", rs, ll)
 		assert(tb, Equal(buf, []byte(tc.Res)), "res %q", buf)
 

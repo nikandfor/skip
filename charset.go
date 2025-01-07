@@ -1,6 +1,7 @@
 package skip
 
 import (
+	"math/bits"
 	"strings"
 	"unicode/utf8"
 )
@@ -32,7 +33,7 @@ var (
 	IDFirst = Letters.SetCopy('_')
 	IDRest  = IDFirst.OrCopy(Decimals.Wide())
 
-	ASCII32 = NewWidesetRange(0, 31)
+	ASCIILow = NewCharsetRange(0, 31)
 )
 
 func Spaces(b []byte, i int) int {
@@ -77,9 +78,14 @@ func (x Wideset) SkipUntilUTF8(b []byte, i int) int {
 			if x.Is(b[i]) {
 				return i
 			}
+
 			i++
 		} else {
-			_, size := utf8.DecodeRune(b[i:])
+			r, size := utf8.DecodeRune(b[i:])
+			if r == utf8.RuneError || x.Is('\n') && (r == '\u2028' || r == '\u2029') {
+				return i
+			}
+
 			i += size
 		}
 	}
@@ -231,10 +237,11 @@ func (x Charset) SkipUntilUTF8(b []byte, i int) int {
 			if x.Is(b[i]) {
 				return i
 			}
+
 			i++
 		} else {
 			r, size := utf8.DecodeRune(b[i:])
-			if r == utf8.RuneError && size == 1 || x.Is('\n') && (r == '\u2028' || r == '\u2029') {
+			if r == utf8.RuneError || x.Is('\n') && (r == '\u2028' || r == '\u2029') {
 				return i
 			}
 
@@ -318,7 +325,7 @@ func (x Charset) UnsetCopy(b byte) Charset {
 		panic(b)
 	}
 
-	return x | 1<<b
+	return x &^ (1 << b)
 }
 
 func (x *Charset) Or(y Charset) {
@@ -342,7 +349,9 @@ func (x Charset) Wide() Wideset { return Wideset{x, 0} }
 func (x Wideset) String() string {
 	var b strings.Builder
 
-	for i := byte(0); i < 128; i++ {
+	_, _ = b.WriteString(x[0].String())
+
+	for i := byte(64); i < 128; i++ {
 		if x.Is(i) {
 			b.WriteByte(i)
 		}
@@ -352,11 +361,45 @@ func (x Wideset) String() string {
 }
 
 func (x Charset) String() string {
+	const hex = "0123456789abcdef"
+
 	var b strings.Builder
 
-	for i := byte(0); i < 64; i++ {
+	switch {
+	case x&ASCIILow == ASCIILow:
+		_, _ = b.WriteString("_low_")
+	case x&ASCIILow == 0:
+	case bits.OnesCount64(uint64(x&ASCIILow)) < 16:
+		for i := byte(0); i < 32; i++ {
+			if !x.Is(i) {
+				continue
+			}
+			if e := sym2esc[i]; e != 0 {
+				_, _ = b.Write([]byte{'\\', e})
+				continue
+			}
+
+			_, _ = b.Write([]byte{'\\', 'x', hex[i>>4], hex[i&0xf]})
+		}
+	default:
+		_, _ = b.WriteString("_exc_")
+
+		for i := byte(0); i < 32; i++ {
+			if x.Is(i) {
+				continue
+			}
+			if e := sym2esc[i]; e != 0 {
+				_, _ = b.Write([]byte{'\\', e})
+				continue
+			}
+
+			_, _ = b.Write([]byte{'\\', 'x', hex[i>>4], hex[i&0xf]})
+		}
+	}
+
+	for i := byte(32); i < 64; i++ {
 		if x.Is(i) {
-			b.WriteByte(i)
+			_ = b.WriteByte(i)
 		}
 	}
 
