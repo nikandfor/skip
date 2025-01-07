@@ -1,3 +1,5 @@
+//go:build ignore
+
 package skip
 
 import "unicode/utf8"

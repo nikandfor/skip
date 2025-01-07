@@ -1,3 +1,5 @@
+//go:build ignore
+
 package skip
 
 func csvSkip(b []byte, st int, flags Str, buf []byte, dec bool) (s Str, _ []byte, bs, rs, i int) {
