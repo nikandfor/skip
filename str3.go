@@ -7,12 +7,7 @@ import (
 )
 
 type (
-	Str int64
-
-	StrOptions struct {
-		Break Wideset
-		Fatal Wideset
-	}
+	Str int
 )
 
 const (
@@ -48,12 +43,11 @@ const (
 	EscControl
 	EscZero
 	EscOctal
-	EscNone
+	EscEmpty
 
 	//
 
-	Quo   = Dqt
-	Break = Continue
+	Quo = Dqt
 
 	StrErr     = 0xff00
 	StrEscapes = 0xff_0000
@@ -87,8 +81,10 @@ func defaultString(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, 
 	}
 
 	s, buf, bs, rs, i = StringBody(b, i, flags, s, buf, brk, fin.OrCopy(q))
-	if s.Err() {
-		return
+	//	if s.Err() {
+	if s.Suppress(flags & StrErr).Err() {
+		//	log.Printf("s %#v  flags %#v", s, flags)
+		return s, buf, bs, rs, i
 	}
 	if i < len(b) && fin.Is(b[i]) {
 		return s | ErrSymbol, buf, bs, rs, i
@@ -160,7 +156,8 @@ func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_
 		if flags.Is(Decode) {
 			buf = append(buf, b[done:i]...)
 		}
-		if s.Err() {
+		//	if s.Err() {
+		if s.Suppress(flags & StrErr).Err() {
 			return s, buf, bs, rs, i
 		}
 
@@ -170,7 +167,8 @@ func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_
 
 		var r rune
 		s, r, i = DecodeRune(b, i, flags, s)
-		if s.Err() {
+		//	if s.Err() {
+		if s.Suppress(flags & StrErr).Err() {
 			return s, buf, bs, rs, i
 		}
 
@@ -239,6 +237,8 @@ func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
 		return s | ErrBuffer, 0, st
 	}
 
+	s |= Escapes
+
 	var size int
 
 	switch {
@@ -294,15 +294,9 @@ func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
 		return s | ErrRune, 0, st
 	}
 
-	if utf16.IsSurrogate(r) {
-		s, r, i = decodeSurrogate(b, st, flags, s, r, size)
+	if !utf16.IsSurrogate(r) {
+		return s, r, i + size
 	}
-
-	return s, r, i + size
-}
-
-func decodeSurrogate(b []byte, st int, flags, s Str, r rune, size int) (Str, rune, int) {
-	i := st + 2
 
 	if i+10 > len(b) {
 		return s | ErrBuffer, r, st
@@ -310,7 +304,7 @@ func decodeSurrogate(b []byte, st int, flags, s Str, r rune, size int) (Str, run
 
 	if b[i+4] != '\\' || b[i+5] != 'u' {
 		if flags.Is(ErrRune) {
-			return s, r, i
+			return s | ErrRune, r, i + size
 		}
 
 		return s | ErrEscape, r, st
@@ -326,9 +320,7 @@ func decodeSurrogate(b []byte, st int, flags, s Str, r rune, size int) (Str, run
 		return s | ErrRune, r, st
 	}
 
-	i += 6
-
-	return s, r, i
+	return s, r, i + 10
 }
 
 func DecodeHex(b []byte, i, size int) (r rune) {
@@ -365,6 +357,10 @@ func (s Str) Err() bool {
 	return s&StrErr != 0
 }
 
+func (s Str) Suppress(x Str) Str {
+	return s &^ x
+}
+
 func (s Str) GoString() string {
 	return fmt.Sprintf("0x%x", int64(s))
 }
@@ -392,6 +388,7 @@ var esc2sym = []byte{
 }
 
 var sym2esc = []byte{
+	0:    '0',
 	'\\': '\\',
 	'/':  '/',
 	'"':  '"',

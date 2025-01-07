@@ -27,7 +27,7 @@ func TestStr(tb *testing.T) {
 		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"abc"`, Res: `abc`},
 		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'abc'`, Res: `abc`},
 
-		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"a\x16c"`, Res: "a\x16c"},
+		{Flags: Bqt | Quo | Sqt, Want: Quo | Escapes, End: -1, In: `"a\x16c"`, Res: "a\x16c"},
 
 		{Flags: Quo, Want: ErrQuote, End: 0, In: "`abc`"},
 		{Flags: Bqt, Want: ErrQuote, End: 0, In: `"abc"`},
@@ -39,15 +39,15 @@ func TestStr(tb *testing.T) {
 
 		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`ab\nc`", Res: "ab\nc"},
 		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`a\"b\n\"c`", Res: "a\"b\n\"c"},
-		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"a\nb\tc"`, Res: "a\nb\tc"},
-		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'a\nb\tc'`, Res: "a\nb\tc"},
+		{Flags: Bqt | Quo | Sqt, Want: Quo | Escapes, End: -1, In: `"a\nb\tc"`, Res: "a\nb\tc"},
+		{Flags: Bqt | Quo | Sqt, Want: Sqt | Escapes, End: -1, In: `'a\nb\tc'`, Res: "a\nb\tc"},
 
 		{Flags: Bqt | Quo | Sqt, Want: Bqt | Unicode, End: -1, In: "`абвгд`", Res: `абвгд`},
 		{Flags: Bqt | Quo | Sqt, Want: Quo | Unicode, End: -1, In: `"абвгд"`, Res: `абвгд`},
 		{Flags: Bqt | Quo | Sqt, Want: Sqt | Unicode, End: -1, In: `'абвгд'`, Res: `абвгд`},
 
-		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
-		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
+		{Flags: Bqt | Quo | Sqt, Want: Quo | Escapes, End: -1, In: `".\n.\t.\x20.\u0030.\U00000035."`, Res: ".\n.\t. .0.5."},
+		{Flags: Bqt | Quo | Sqt, Want: Sqt | Escapes, End: -1, In: `'.\n.\t.\x20.\u0030.\U00000035.'`, Res: ".\n.\t. .0.5."},
 
 		/*
 			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, End: 1, In: `1`, Res: `1`},
@@ -67,10 +67,10 @@ func TestStr(tb *testing.T) {
 		//	{Flags: URL, Want: URL | ErrSymbol, End: -1, In: `"%20%33"`, Res: `" 3"`},
 		//	{Flags: URL, Want: URL, St: 8, End: 12, In: `abc=def&qw+e=asd&zxc`, Res: `qw e`, NoWrap: true},
 
-		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},
-		{Flags: Quo | ErrRune, Want: Quo, End: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
+		{Flags: Quo | ErrRune, Want: Quo | Escapes, End: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},
+		{Flags: Quo | ErrRune, Want: Quo | Escapes | ErrRune, End: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
 
-		{Flags: Quo | Sqt, Want: Quo, End: -1, In: `"a\/b"`, Res: `a/b`},
+		{Flags: Quo | Sqt, Want: Quo | Escapes, End: -1, In: `"a\/b"`, Res: `a/b`},
 	} {
 		var wrap []byte = []byte("\n\n\t\t")
 		var in []byte
