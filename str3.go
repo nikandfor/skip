@@ -30,8 +30,8 @@ const (
 
 	ErrSymbol
 	_
-	_
-	_
+	EscEmpty
+	EscPlus
 
 	//
 
@@ -43,14 +43,14 @@ const (
 	EscControl
 	EscZero
 	EscOctal
-	EscEmpty
+	_
 
 	//
 
 	Quo = Dqt
 
-	StrErr     = 0xff00
-	StrEscapes = 0xff_0000
+	StrErr     = 0x3f00
+	StrEscapes = 0xff_c000
 )
 
 func String(b []byte, st int, flags Str) (s Str, bs, rs, i int) {
@@ -146,12 +146,12 @@ func StringClose(b []byte, st int, flags, s Str) (ss Str, i int) {
 
 func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_ Str, _ []byte, bs, rs, i int) {
 	i = st
-	brk.Or(fin)
+	stop := brk.OrCopy(fin)
 
 	for i < len(b) {
 		done := i
 
-		s, rs, i = StringUntil(b, i, flags, s, rs, brk)
+		s, rs, i = StringUntil(b, i, flags, s, rs, stop)
 		bs += i - done
 		if flags.Is(Decode) {
 			buf = append(buf, b[done:i]...)
@@ -161,7 +161,7 @@ func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_
 			return s, buf, bs, rs, i
 		}
 
-		if i == len(b) || fin.Is(b[i]) {
+		if i == len(b) || !brk.Is(b[i]) {
 			break
 		}
 
@@ -218,6 +218,23 @@ func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
 		return s | ErrBuffer, 0, st
 	}
 
+	if b[i] == '+' && flags.Is(EscPlus) {
+		return s | Escapes, ' ', i + 1
+	}
+
+	if b[i] == '%' && flags.Is(EscPercent) {
+		if i+3 > len(b) {
+			return s | ErrBuffer, 0, st
+		}
+
+		r = DecodeHex(b, i+1, 2)
+		if r < 0 {
+			return s | Str(-r), 0, st
+		}
+
+		return s | Escapes, r, i + 3
+	}
+
 	if b[i] != '\\' {
 		if !utf8.FullRune(b[i:]) {
 			return s | ErrBuffer, 0, st
@@ -255,7 +272,7 @@ func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
 		return s, '\x00', i + 1
 	case b[i] >= '0' && b[i] <= '7' && flags.Is(EscOctal):
 		size = 3
-		if i+size >= len(b) {
+		if i+size > len(b) {
 			return s | ErrBuffer, 0, st
 		}
 

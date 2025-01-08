@@ -25,8 +25,8 @@ var (
 	Upper   = NewWidesetRange('A', 'Z')
 	Letters = Lower.OrCopy(Upper)
 
-	Underscore   = NewWideset("_")
-	Punctuations = NewWideset(".,-+")
+	Underscore = NewWideset("_")
+	//	Punctuations = NewWideset(".,-+")
 
 	WordSymbols = Letters.OrCopy(Decimals.Wide()).MergeCopy("_")
 

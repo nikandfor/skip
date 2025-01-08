@@ -133,11 +133,11 @@ func TestStrContinue(tb *testing.T) {
 		w = w[:0]
 
 		s, w, rs0, i := DecodeString(b[:st], 0, Quo, w)
-		tb.Logf("%#x: %[1]v", s)
+		//	tb.Logf("%#x: %[1]v", s)
 		assert(tb, s.Is(ErrBuffer), "wanted error: %v", s)
 
 		s, w, rs1, i := DecodeString(b, i, s|Continue, w)
-		tb.Logf("%#x: %[1]v", s)
+		//	tb.Logf("%#x: %[1]v", s)
 		assert(tb, !s.Err(), "didn't want error: %v", s)
 		assert(tb, rs0+rs1 == exprs, "rune count %d + %d != %d  (%d: %s|%s)", rs0, rs1, exprs, st, b[:st], b[st:])
 
