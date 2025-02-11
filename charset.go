@@ -33,7 +33,7 @@ var (
 	IDFirst = Letters.SetCopy('_')
 	IDRest  = IDFirst.OrCopy(Decimals.Wide())
 
-	ASCIILow = NewCharsetRange(0, 31)
+	ASCIIControls = NewCharsetRange(0, 31)
 )
 
 func Spaces(b []byte, i int) int {
@@ -366,10 +366,10 @@ func (x Charset) String() string {
 	var b strings.Builder
 
 	switch {
-	case x&ASCIILow == ASCIILow:
+	case x&ASCIIControls == ASCIIControls:
 		_, _ = b.WriteString("_low_")
-	case x&ASCIILow == 0:
-	case bits.OnesCount64(uint64(x&ASCIILow)) < 16:
+	case x&ASCIIControls == 0:
+	case bits.OnesCount64(uint64(x&ASCIIControls)) < 16:
 		for i := byte(0); i < 32; i++ {
 			if !x.Is(i) {
 				continue

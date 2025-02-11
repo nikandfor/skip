@@ -65,7 +65,7 @@ func DecodeString(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, r
 
 func defaultString(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, bs, rs, i int) {
 	var brk Wideset
-	fin := ASCIILow.Wide()
+	fin := ASCIIControls.Wide()
 
 	s, q, i := StringOpen(b, st, flags)
 	if s.Err() {
@@ -81,9 +81,7 @@ func defaultString(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, 
 	}
 
 	s, buf, bs, rs, i = StringBody(b, i, flags, s, buf, brk, fin.OrCopy(q))
-	//	if s.Err() {
 	if s.Suppress(flags & StrErr).Err() {
-		//	log.Printf("s %#v  flags %#v", s, flags)
 		return s, buf, bs, rs, i
 	}
 	if i < len(b) && fin.Is(b[i]) {
@@ -119,7 +117,7 @@ func StringOpen(b []byte, st int, flags Str) (s Str, q Wideset, i int) {
 		return ErrQuote, q, st
 	}
 
-	if flags.Any(Dqt|Sqt|Bqt) && !flags.Is(Continue) {
+	if s.Any(Dqt|Sqt|Bqt) && !flags.Is(Continue) {
 		i++
 	}
 
@@ -131,7 +129,7 @@ func StringClose(b []byte, st int, flags, s Str) (ss Str, i int) {
 
 	switch {
 	case s.Is(Raw):
-		return
+		return s, st
 	case i >= len(b):
 		return s | ErrBuffer, st
 	case s.Is(Dqt) && b[i] == '"':
@@ -156,7 +154,6 @@ func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_
 		if flags.Is(Decode) {
 			buf = append(buf, b[done:i]...)
 		}
-		//	if s.Err() {
 		if s.Suppress(flags & StrErr).Err() {
 			return s, buf, bs, rs, i
 		}
@@ -167,7 +164,6 @@ func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_
 
 		var r rune
 		s, r, i = DecodeRune(b, i, flags, s)
-		//	if s.Err() {
 		if s.Suppress(flags & StrErr).Err() {
 			return s, buf, bs, rs, i
 		}

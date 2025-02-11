@@ -1,7 +1,7 @@
 package skip
 
 const (
-	URLValue = Continue
+	URLValue = Bqt
 )
 
 var (
@@ -25,19 +25,33 @@ func URL(b []byte, st int, flags Str) (s Str, bs, rs, i int) {
 	return s, bs, rs, i
 }
 
+func URLQuery(b []byte, st int, flags Str) (s Str, bs, rs, i int) {
+	flags &^= Decode
+
+	s, _, bs, rs, i = urlQuery(b, st, flags, nil)
+	return
+}
+
 func DecodeURLQuery(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, rs, i int) {
-	fin := ASCIILow.Wide()
+	flags |= Decode
+
+	s, res, _, rs, i = urlQuery(b, st, flags, buf)
+	return
+}
+
+func urlQuery(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, bs, rs, i int) {
+	fin := ASCIIControls.Wide()
 	fin.Merge("&#")
 	if !flags.Is(URLValue) {
 		fin.Set('=')
 	}
 
-	flags |= Decode | EscPlus | EscPercent
+	flags |= EscPlus | EscPercent
 
-	s, buf, _, rs, i = StringBody(b, st, flags, s, nil, percent, fin)
+	s, buf, bs, rs, i = StringBody(b, st, flags, s, buf, percent, fin)
 	if s.Suppress(flags & StrErr).Err() {
-		return s, buf, rs, i
+		return s, buf, bs, rs, i
 	}
 
-	return s, buf, rs, i
+	return s, buf, bs, rs, i
 }
