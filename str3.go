@@ -2,6 +2,8 @@ package skip
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -81,7 +83,7 @@ func defaultString(b []byte, st int, flags Str, buf []byte) (s Str, res []byte, 
 	}
 
 	s, buf, bs, rs, i = StringBody(b, i, flags, s, buf, brk, fin.OrCopy(q))
-	if s.Suppress(flags & StrErr).Err() {
+	if s.Err() {
 		return s, buf, bs, rs, i
 	}
 	if i < len(b) && fin.Is(b[i]) {
@@ -154,17 +156,17 @@ func StringBody(b []byte, st int, flags, s Str, buf []byte, brk, fin Wideset) (_
 		if flags.Is(Decode) {
 			buf = append(buf, b[done:i]...)
 		}
-		if s.Suppress(flags & StrErr).Err() {
+		if s.Err() {
 			return s, buf, bs, rs, i
 		}
 
-		if i == len(b) || !brk.Is(b[i]) {
+		if i == len(b) || fin.Is(b[i]) {
 			break
 		}
 
 		var r rune
 		s, r, i = DecodeRune(b, i, flags, s)
-		if s.Suppress(flags & StrErr).Err() {
+		if s.Err() {
 			return s, buf, bs, rs, i
 		}
 
@@ -208,7 +210,9 @@ func StringUntil(b []byte, st int, flags, s Str, rs int, brk Wideset) (_ Str, rs
 }
 
 func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
-	//	defer func() { log.Printf("decStrCh %d %q -> %d  => %v  from %v", st, b[st], i, ss, loc.Caller(1)) }()
+	//	defer func() {
+	//		log.Printf("DecodeRune: f %#8v  s %#4v => ss %#4v  %3v -> %3v  from %v  b %q", flags, s, ss, st, i, caller(1), b[st:])
+	//	}()
 	i = st
 	if i >= len(b) {
 		return s | ErrBuffer, 0, st
@@ -309,41 +313,62 @@ func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
 	}
 
 	r = DecodeHex(b, i, size)
+	if r < 0 && flags.Is(ErrRune) {
+		return s, utf8.RuneError, i + size
+	}
 	if r < 0 {
 		return s | Str(-r), 0, st
 	}
 
 	if utf16.IsSurrogate(r) && b[i-1] != 'u' { // expect surrogate only from \uXXXX encoding
-		return s | ErrRune, 0, st
+		return s | ErrEscape, 0, st
 	}
 
 	if !utf16.IsSurrogate(r) {
 		return s, r, i + size
 	}
 
-	if i+10 > len(b) {
+	i += 4
+
+	if i == len(b) {
 		return s | ErrBuffer, r, st
 	}
 
-	if b[i+4] != '\\' || b[i+5] != 'u' {
-		if flags.Is(ErrRune) {
-			return s | ErrRune, r, i + size
-		}
-
+	if b[i] != '\\' && flags.Any(ErrRune|ErrEscape) {
+		return s, utf8.RuneError, i
+	}
+	if b[i] != '\\' {
 		return s | ErrEscape, r, st
 	}
 
-	r2 := DecodeHex(b, i+6, size)
+	if i+1 == len(b) {
+		return s | ErrBuffer, r, st
+	}
+	if b[i+1] != 'u' && flags.Is(ErrEscape) {
+		return s, utf8.RuneError, i
+	}
+	if b[i+1] != 'u' {
+		return s | ErrEscape, r, st
+	}
+
+	if i+6 > len(b) {
+		return s | ErrBuffer, r, st
+	}
+
+	r2 := DecodeHex(b, i+2, size)
 	if r2 < 0 {
 		return s | Str(-r2), 0, st
 	}
 
 	r = utf16.DecodeRune(r, r2)
+	if r == utf8.RuneError && flags.Is(ErrRune) {
+		return s, r, i
+	}
 	if r == utf8.RuneError {
 		return s | ErrRune, r, st
 	}
 
-	return s, r, i + 10
+	return s, r, i + 6
 }
 
 func DecodeHex(b []byte, i, size int) (r rune) {
@@ -358,6 +383,10 @@ func DecodeHex(b []byte, i, size int) (r rune) {
 		} else {
 			return -rune(ErrEscape)
 		}
+	}
+
+	if r < 0 {
+		return -rune(ErrRune)
 	}
 
 	return r
@@ -425,6 +454,12 @@ func csel[T any](c bool, x, y T) T {
 	}
 
 	return y
+}
+
+func caller(d int) string {
+	_, file, line, _ := runtime.Caller(1 + d)
+
+	return fmt.Sprintf("%v:%v", filepath.Base(file), line)
 }
 
 var esc2sym = []byte{

@@ -1,10 +1,5 @@
 package skip
 
-import (
-	"fmt"
-	"runtime"
-)
-
 func CSV(b []byte, st int, flags Str, comma byte) (s Str, bs, rs, i int) {
 	flags &^= Decode
 
@@ -94,10 +89,4 @@ func csv(b []byte, st int, flags Str, comma byte, buf []byte) (s Str, res []byte
 	}
 
 	return s, buf, bs, rs, i
-}
-
-func caller(d int) string {
-	_, file, line, _ := runtime.Caller(1 + d)
-
-	return fmt.Sprintf("%v:%d", file, line)
 }

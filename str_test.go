@@ -23,6 +23,7 @@ func TestStr(tb *testing.T) {
 	var failj int
 
 	for j, tc := range []TC{
+		// 0
 		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`abc`", Res: `abc`},
 		{Flags: Bqt | Quo | Sqt, Want: Quo, End: -1, In: `"abc"`, Res: `abc`},
 		{Flags: Bqt | Quo | Sqt, Want: Sqt, End: -1, In: `'abc'`, Res: `abc`},
@@ -37,6 +38,7 @@ func TestStr(tb *testing.T) {
 		{Flags: Bqt | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc`", Res: "abc`"},
 		{Flags: Bqt | Quo | Sqt, Want: Quo | ErrSymbol, End: 5, In: "\"abc'", Res: "abc'"},
 
+		// 10
 		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`ab\nc`", Res: "ab\nc"},
 		{Flags: Bqt | Quo | Sqt, Want: Bqt, End: -1, In: "`a\"b\n\"c`", Res: "a\"b\n\"c"},
 		{Flags: Bqt | Quo | Sqt, Want: Quo | Escapes, End: -1, In: `"a\nb\tc"`, Res: "a\nb\tc"},
@@ -63,12 +65,16 @@ func TestStr(tb *testing.T) {
 			{Flags: CSV | Quo | Sqt | Bqt | Raw | ',', Want: CSV | Raw, St: 14, End: 19, In: `a b c, d e f ,q w e`, Res: `q w e`},
 		*/
 
+		// 19
 		{Flags: Quo | Sqt | Bqt, Want: Quo, End: -1, In: `"%20%33"`, Res: `%20%33`},
 		//	{Flags: URL, Want: URL | ErrSymbol, End: -1, In: `"%20%33"`, Res: `" 3"`},
 		//	{Flags: URL, Want: URL, St: 8, End: 12, In: `abc=def&qw+e=asd&zxc`, Res: `qw e`, NoWrap: true},
 
+		// 20
 		{Flags: Quo | ErrRune, Want: Quo | Escapes, End: -1, In: `"\uD800\uDC00"`, Res: `𐀀`},
-		{Flags: Quo | ErrRune, Want: Quo | Escapes | ErrRune, End: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
+		{Flags: Quo | ErrRune, Want: Quo | Escapes, End: -1, In: `"\uD80000DC00"`, Res: `�00DC00`},
+		{Flags: Quo | ErrRune, Want: Quo | Escapes, End: -1, In: `"\U80000000"`, Res: `�`},
+		{Flags: Quo, Want: Quo | Escapes | ErrRune, End: 1, In: `"\U80000000"`},
 
 		{Flags: Quo | Sqt, Want: Quo | Escapes, End: -1, In: `"a\/b"`, Res: `a/b`},
 	} {
