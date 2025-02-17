@@ -43,7 +43,7 @@ const (
 	EscControl
 	EscZero
 	EscOctal
-	_
+	DecNewline
 
 	//
 
@@ -214,6 +214,16 @@ func DecodeRune(b []byte, st int, flags, s Str) (ss Str, r rune, i int) {
 		return s | ErrBuffer, 0, st
 	}
 
+	if flags.Is(DecNewline) && (b[i] == '\n' || b[i] == '\r') {
+		i++
+
+		for i < len(b) && (b[i] == '\n' || b[i] == '\r') {
+			i++
+		}
+
+		return s | DecNewline, '\n', i
+	}
+
 	if b[i] == '+' && flags.Is(EscPlus) {
 		return s | Escapes, ' ', i + 1
 	}
@@ -376,6 +386,37 @@ func (s Str) Suppress(x Str) Str {
 
 func (s Str) GoString() string {
 	return fmt.Sprintf("0x%x", int64(s))
+}
+
+func (s Str) Error() string {
+	if !s.Err() {
+		return "ok"
+	}
+
+	r := ""
+	comma := false
+
+	add := func(e Str, t string) {
+		if !s.Is(e) {
+			return
+		}
+
+		r += csel(comma, ", ", "")
+		r += t
+		comma = true
+	}
+
+	add(ErrBuffer, "short buffer")
+	add(ErrQuote, "bad quote")
+	add(ErrRune, "bad rune")
+	add(ErrEscape, "bad escape")
+	add(ErrSymbol, "bad symbol")
+
+	if r == "" {
+		r = fmt.Sprintf("%#x", int(s))
+	}
+
+	return r
 }
 
 func csel[T any](c bool, x, y T) T {
